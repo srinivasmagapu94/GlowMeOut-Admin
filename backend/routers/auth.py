@@ -14,14 +14,14 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 
 @router.post("/login", response_model=AdminUser)
-async def login(payload: LoginRequest, response: Response):
+async def login(payload: LoginRequest, request: Request, response: Response):
     admin = await db.admins.find_one({"email": payload.email.strip().lower()})
     if not admin or not verify_password(payload.password, admin.get("password_hash", "")):
         raise HTTPException(status_code=401, detail="Invalid email or password")
 
     last_login = datetime.now(timezone.utc).isoformat(timespec="seconds")
     await db.admins.update_one({"id": admin["id"]}, {"$set": {"last_login": last_login}})
-    await create_session(response, admin["id"])
+    await create_session(request, response, admin["id"])
     admin["last_login"] = last_login
     return AdminUser(**{k: v for k, v in admin.items() if k not in ("_id", "password_hash")})
 

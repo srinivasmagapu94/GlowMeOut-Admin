@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ApiError } from "@/lib/api";
-import { beginSession, fetchMe, login, ME_KEY } from "@/lib/session";
+import { confirmSession, fetchMe, login, ME_KEY } from "@/lib/session";
 
 const ASSURANCES = [
   "Role-scoped access for operations, verification, finance and support teams",
@@ -30,10 +30,9 @@ export default function Login() {
     event.preventDefault();
     setError("");
     setBusy(true);
+
     try {
       await login(email.trim(), password);
-      await beginSession();
-      navigate(redirectTo, { replace: true });
     } catch (err) {
       if (err instanceof ApiError && err.status === 401) {
         setError("Those credentials were not recognised. Check the email and password.");
@@ -42,9 +41,24 @@ export default function Login() {
       } else {
         setError("The operations API is unreachable. Try again in a moment.");
       }
-    } finally {
       setBusy(false);
+      return;
     }
+
+    // Credentials were accepted — now prove the session cookie is actually being sent,
+    // so a blocked cookie surfaces as a clear message instead of a bounce back here.
+    try {
+      await confirmSession();
+    } catch {
+      setError(
+        "Signed in, but this browser did not return the session cookie. Allow third-party cookies for this site, or open the app in its own browser tab.",
+      );
+      setBusy(false);
+      return;
+    }
+
+    setBusy(false);
+    navigate(redirectTo, { replace: true });
   };
 
   return (

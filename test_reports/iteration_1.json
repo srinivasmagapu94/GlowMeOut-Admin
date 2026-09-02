@@ -1,0 +1,95 @@
+{
+  "iteration": 1,
+  "summary": "9 backend tests passed. 8 browser checks: 7 passed, 1 failed (real bug: profile dropdown menu crashes on open, blocking logout via UI).",
+  "passed": 16,
+  "failed": 1,
+  "bugs": [
+    {
+      "criterion": "Logout clears the session and blocks the dashboard again",
+      "severity": "high",
+      "type": "bug",
+      "description": "Opening the admin profile menu (clicking admin-profile-trigger) crashes the app: Base UI throws 'MenuGroupContext is missing. Menu group parts must be used within <Menu.Group> or <Menu.RadioGroup>.' because AdminLayout.tsx renders <DropdownMenuLabel> (which wraps Base UI's Menu.GroupLabel) directly inside <DropdownMenuContent> without wrapping it in <DropdownMenuGroup> (Menu.Group). The page goes blank and profile-menu-signout never becomes visible, so a signed-in admin can never sign out through the UI.",
+      "location": "frontend/src/components/admin/AdminLayout.tsx lines 301-308 (DropdownMenuLabel not wrapped in DropdownMenuGroup); frontend/src/components/ui/dropdown-menu.tsx DropdownMenuLabel implementation uses MenuPrimitive.GroupLabel which requires a Menu.Group/RadioGroup ancestor.",
+      "evidence": "Browser check 'logout-blocks-dashboard-again' failed twice (not flaky) with pageerror: 'Base UI: MenuGroupContext is missing...' and getByTestId('profile-menu-signout') never found (blank page screenshot). Cross-check: POST /api/auth/logout on the running backend returns 200 directly (curl), proving the backend logout endpoint itself is healthy and this is a frontend-only rendering bug, not an API failure."
+    }
+  ],
+  "action_items": [
+    {
+      "type": "bug_fix_needed",
+      "detail": "Wrap the profile DropdownMenuLabel (and its following content) in a <DropdownMenuGroup> in AdminLayout.tsx, or make DropdownMenuLabel tolerant of missing Group context, so opening the profile menu no longer crashes and sign-out becomes reachable again."
+    }
+  ],
+  "retest_needed": true,
+  "checks": [
+    {
+      "criterion": "Backend: SameSite=None;Secure cookie over HTTPS enables cross-site iframe auth; SameSite=Lax kept on plain HTTP; cookie authenticates next request over real TLS; unauthenticated requests get 401; wrong password rejected; logout clears session",
+      "name": "test_tscheck_auth_session_cookie_policy.py",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "9 assertions across 6 tests passed: login over X-Forwarded-Proto:https sets 'samesite=none; secure' (localhost:8001); login over plain http sets 'samesite=lax' with no secure; against the real public HTTPS URL, POST /auth/login -> 200 with Set-Cookie SameSite=None; Secure, then GET /auth/me -> 200 {email: admin@glowmeout.example}; unauthenticated GET /auth/me and GET /customers -> 401; wrong password -> 401/400 with no session cookie set; POST /auth/logout -> 200 then GET /auth/me -> 401."
+    },
+    {
+      "criterion": "Dashboard opens from the preview: log in while the app is inside a cross-site iframe over HTTPS",
+      "name": "iframe-login-opens-dashboard",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Public URL loaded inside a cross-site iframe on a fake outer origin; login-form visible pre-login; after clicking login-submit-button frame URL -> /dashboard, dashboard-page visible, login-form and login-error absent, kpi-gross_volume-value shows a numeric currency value. GET /api/auth/me calls after the login POST returned 200 (only the 2 pre-login probe 401s occurred, as expected)."
+    },
+    {
+      "criterion": "Session persists across navigation inside the iframe",
+      "name": "iframe-session-persists-on-nav",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "From the iframe dashboard, clicked nav-customers; frame URL -> /customers, customers-table visible, customers-header-count read '240 records', no login-form, GET /api/customers returned 200 with no 401s."
+    },
+    {
+      "criterion": "Session survives a cold reload of a deep link inside the iframe",
+      "name": "iframe-session-survives-cold-reload",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "After login inside the iframe, reloaded the outer shell page (iframe cold-loads /dashboard fresh); dashboard-page rendered directly with no login-form, no re-login required."
+    },
+    {
+      "criterion": "Unauthenticated access is still correctly gated",
+      "name": "unauth-dashboard-redirects-to-login",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Fresh context, cookies cleared, visiting /dashboard redirected to /login and showed login-form; GET /api/customers without a session returned 401 (page.request.get)."
+    },
+    {
+      "criterion": "Logout clears the session and blocks the dashboard again",
+      "name": "logout-blocks-dashboard-again",
+      "lane": "browser",
+      "status": "failed",
+      "evidence": "Signed in successfully, dashboard-page visible. Clicked admin-profile-trigger; the menu crashed with pageerror 'Base UI: MenuGroupContext is missing. Menu group parts must be used within <Menu.Group> or <Menu.RadioGroup>.', page rendered blank, profile-menu-signout never appeared (10s timeout, reran once, same failure -> not flaky). Backend cross-check: curl -X POST http://localhost:8001/api/auth/logout -> 200, confirming the API is healthy and this is a frontend-only crash."
+    },
+    {
+      "criterion": "Wrong credentials are rejected with a visible message",
+      "name": "wrong-credentials-shows-error",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Filled password with an incorrect value and submitted; login-error became visible with a credentials message, URL stayed on /login, login-form still shown, no crash."
+    },
+    {
+      "criterion": "Core console pages still render after the auth change (regression check)",
+      "name": "core-nav-pages-render",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Signed in, clicked each of nav-customers/partners/verification/bookings/payments/reviews/support/offers/analytics/notifications/settings in sequence; every corresponding page container (customers-table, partners-table, partner-verification-page, bookings-table, payments-table, reviews-table, support-page, offers-table, analytics-page, notifications-page, settings-page) became visible; no >=400 API responses (excluding the expected pre-login auth/me probe) and no page errors."
+    },
+    {
+      "criterion": "Partner verification decision flow still works end to end (regression check) — UI",
+      "name": "verification-approve-decision-flow",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Filtered verifications-filter-status to Pending, opened a pending row (verification-workspace-status read 'Pending'); clicked a document's *-set-verified button and verification-doc-progress changed value; submitted a note via verification-note-input/verification-note-submit and it appeared in the trail; clicked Approve, filled a reason, confirmed -> verification-workspace-status became 'Verified'; reloaded the page and status stayed 'Verified'."
+    },
+    {
+      "criterion": "Partner verification decision flow still works end to end (regression check) — API",
+      "name": "test_tscheck_partner_verification_decision_flow.py",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "GET /verifications?status=pending -> 200 with items all status=pending; GET /verifications/facets -> 200; PATCH /verifications/{id}/documents/{docId} {status:verified} -> 200 with the doc updated; POST /verifications/{id}/notes -> 200 with the note text present; POST /verifications/{id}/decision {action:approve} -> 200 status=verified, persisted on a fresh GET; POST .../decision {action:reject, reason:''} -> 400 (reason required, correctly rejected)."
+    }
+  ]
+}

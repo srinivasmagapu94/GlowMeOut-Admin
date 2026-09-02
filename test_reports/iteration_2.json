@@ -1,0 +1,94 @@
+{
+  "iteration": 2,
+  "mode": "retest",
+  "summary": "Retest after fix for the profile-menu MenuGroupContext crash (AdminLayout.tsx DropdownMenuGroup wrap). Re-seeded DB to restore pending verification applications consumed by earlier runs (per seed_facts note), then re-ran full backend suite (9/9 passed) and all 8 previously-authored browser checks (8/8 passed), including logout-blocks-dashboard-again which exercises the exact iteration-1 crash path (open admin-profile-trigger -> profile-menu-signout) and now completes with no pageerror and correct session invalidation.",
+  "passed": 10,
+  "failed": 0,
+  "bugs": [],
+  "action_items": [
+    {
+      "type": "note",
+      "detail": "Verification backend tests (test_tscheck_partner_verification_decision_flow.py) initially failed with 0 pending applications because earlier test/browser runs had approved all seeded pending rows (as flagged in seed_facts). Re-ran `python seed.py` to restore fixture data; suite passed cleanly afterward. Not an application bug, just fixture exhaustion across iterations - future runs may need re-seeding again."
+    }
+  ],
+  "retest_needed": false,
+  "checks": [
+    {
+      "criterion": "Backend session cookie policy unchanged",
+      "name": "test_tscheck_auth_session_cookie_policy.py",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "pytest: all cookie-policy assertions passed (HTTPS SameSite=None;Secure, HTTP SameSite=Lax, authed 200, unauthed 401, wrong password 401, logout then /auth/me 401)."
+    },
+    {
+      "criterion": "Verification decision flow backend (list pending, note, approve) unchanged",
+      "name": "test_tscheck_partner_verification_decision_flow.py",
+      "lane": "backend",
+      "status": "passed",
+      "evidence": "After `python seed.py` re-seed restored pending applications, `python -m pytest -q` -> 9 passed in 1.75s (all files)."
+    },
+    {
+      "criterion": "Profile menu opens without crashing (the iteration-1 bug)",
+      "name": "logout-blocks-dashboard-again",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Reran persisted check: opens admin-profile-trigger, clicks profile-menu-signout, lands on /login; screenshot after-logout-login-form.png shows login form, no blank page, only 401 console noise from the expected unauthenticated /auth/me probe (x4, none is 'MenuGroupContext is missing')."
+    },
+    {
+      "criterion": "Logout clears the session and blocks the dashboard again (previously failed)",
+      "name": "logout-blocks-dashboard-again",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Reran persisted check PASSED: signout -> /login, then visiting /dashboard redirects back to /login (dashboard-blocked-after-logout.png); console shows expected 401s only."
+    },
+    {
+      "criterion": "Preview iframe: login opens dashboard inside cross-site iframe",
+      "name": "iframe-login-opens-dashboard",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Reran persisted check PASSED against management-hub-40.preview.emergentagent.com in iframe; screenshots show login-form then dashboard-page rendered inside iframe."
+    },
+    {
+      "criterion": "Preview iframe: session persists across nav (customers, 240 records)",
+      "name": "iframe-session-persists-on-nav",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Reran persisted check PASSED; customers-table-in-iframe.png shows table loaded after in-app nav, session intact."
+    },
+    {
+      "criterion": "Preview iframe: session survives cold reload of deep link",
+      "name": "iframe-session-survives-cold-reload",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Reran persisted check PASSED; cold-reload-dashboard.png shows dashboard rendered with no re-login prompt after full reload."
+    },
+    {
+      "criterion": "Unauthenticated gating: cold /dashboard visit redirects to /login",
+      "name": "unauth-dashboard-redirects-to-login",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Reran persisted check PASSED; redirected-to-login.png confirms /login with login-form; console 401s are the expected unauthenticated probe."
+    },
+    {
+      "criterion": "Wrong-credential handling shows login-error and stays on /login",
+      "name": "wrong-credentials-shows-error",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Reran persisted check PASSED; login-error-shown.png confirms error banner, still on /login."
+    },
+    {
+      "criterion": "Core console pages: all 11 nav destinations render with data, no console errors/>=400",
+      "name": "core-nav-pages-render",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Reran persisted check PASSED: 'nav-customers: OK | nav-partners: OK | nav-verification: OK | nav-bookings: OK | nav-payments: OK | nav-reviews: OK | nav-support: OK | nav-offers: OK | nav-analytics: OK | nav-notifications: OK | nav-settings: OK'; only the expected 401 probe in console."
+    },
+    {
+      "criterion": "Verification workspace: mark verified, add note, approve with reason, persists across reload",
+      "name": "verification-approve-decision-flow",
+      "lane": "browser",
+      "status": "passed",
+      "evidence": "Reran persisted check PASSED after DB re-seed restored pending rows; screenshots show workspace-open, doc-verified, approved-status, and approved-status-after-reload confirming persistence."
+    }
+  ]
+}

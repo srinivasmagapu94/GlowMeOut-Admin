@@ -40,7 +40,23 @@ def _now() -> datetime:
     return datetime.now(timezone.utc)
 
 
-async def create_session(response: Response, admin_id: str) -> str:
+def cookie_policy(request: Request) -> Dict[str, Any]:
+    """Pick cookie attributes that survive the deployment context.
+
+    The preview/production app is served inside a CROSS-SITE IFRAME, where a
+    `SameSite=Lax` cookie is treated as third-party and silently not sent — login
+    succeeds but every later request is 401. Over HTTPS we therefore need
+    `SameSite=None; Secure`. Plain-HTTP localhost cannot use `Secure`, so it keeps
+    `Lax` (same-site there anyway) and local browser tests still work.
+    """
+    forwarded = request.headers.get("x-forwarded-proto", "")
+    proto = forwarded.split(",")[0].strip() or request.url.scheme
+    if proto == "https":
+        return {"samesite": "none", "secure": True}
+    return {"samesite": "lax", "secure": False}
+
+
+async def create_session(request: Request, response: Response, admin_id: str) -> str:
     token = secrets.token_urlsafe(32)
     await db.admin_sessions.insert_one(
         {
@@ -54,10 +70,9 @@ async def create_session(response: Response, admin_id: str) -> str:
         key=COOKIE_NAME,
         value=token,
         httponly=True,
-        samesite="lax",
-        secure=False,
         max_age=SESSION_DAYS * 24 * 3600,
         path="/",
+        **cookie_policy(request),
     )
     return token
 
@@ -66,7 +81,11 @@ async def destroy_session(request: Request, response: Response) -> None:
     token = request.cookies.get(COOKIE_NAME)
     if token:
         await db.admin_sessions.delete_many({"token": token})
-    response.delete_cookie(COOKIE_NAME, path="/")
+    # Attributes must match the ones used to set it, or the browser keeps the cookie.
+    policy = cookie_policy(request)
+    response.delete_cookie(
+        COOKIE_NAME, path="/", samesite=policy["samesite"], secure=policy["secure"]
+    )
 
 
 async def current_admin(request: Request) -> Dict[str, Any]:

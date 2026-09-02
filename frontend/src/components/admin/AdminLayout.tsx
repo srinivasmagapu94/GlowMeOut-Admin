@@ -21,6 +21,7 @@ import { Input } from "@/components/ui/input";
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
@@ -299,13 +300,17 @@ export default function AdminLayout() {
                 </span>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-60">
-                <DropdownMenuLabel className="space-y-0.5">
-                  <p className="text-xs font-semibold text-slate-800">{admin?.name ?? "Administrator"}</p>
-                  <p className="text-[11px] font-normal text-slate-500">{admin?.email ?? "—"}</p>
-                  <p className="text-[11px] font-normal text-slate-500">
-                    Last sign-in {fmtRelative(admin?.last_login)}
-                  </p>
-                </DropdownMenuLabel>
+                {/* GroupLabel requires a Menu.Group ancestor — without it base-ui throws
+                    "MenuGroupContext is missing" and the whole menu fails to render. */}
+                <DropdownMenuGroup>
+                  <DropdownMenuLabel className="space-y-0.5">
+                    <p className="text-xs font-semibold text-slate-800">{admin?.name ?? "Administrator"}</p>
+                    <p className="text-[11px] font-normal text-slate-500">{admin?.email ?? "—"}</p>
+                    <p className="text-[11px] font-normal text-slate-500">
+                      Last sign-in {fmtRelative(admin?.last_login)}
+                    </p>
+                  </DropdownMenuLabel>
+                </DropdownMenuGroup>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
                   onClick={() => navigate("/settings")}
