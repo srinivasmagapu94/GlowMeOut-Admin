@@ -1,0 +1,254 @@
+{
+  "theme": "light_enterprise",
+  "archetype": "SWISS & HIGH-CONTRAST / DEEP INDIGO SAAS (Enterprise Operations Platform)",
+  "app_context": "dashboard",
+  "brand_identity": {
+    "name": "GlowMeOut Admin",
+    "description": "Enterprise-grade operations and service provider lifecycle management platform for GlowMeOut beauty & wellness ecosystem. Engineered for mission-critical operations, partner verification, customer support, automated billing, and detailed audit trails.",
+    "tone": "Authoritative, crisp, operational, data-dense, distraction-free neutral UI with precision deep indigo/navy accent"
+  },
+  "typography": {
+    "font_family_import": "@import \"@fontsource-variable/manrope\";",
+    "font_mono_import": "@import \"@fontsource/ibm-plex-mono\";",
+    "font_heading": "'Manrope Variable', -apple-system, BlinkMacSystemFont, sans-serif",
+    "font_sans": "'Manrope Variable', -apple-system, BlinkMacSystemFont, sans-serif",
+    "font_mono": "'IBM Plex Mono', monospace",
+    "scale_px": {
+      "display": 36,
+      "h1": 28,
+      "h2": 22,
+      "h3": 18,
+      "body": 14,
+      "caption": 12
+    },
+    "letter_spacing": {
+      "headings": "tracking-tight",
+      "labels": "tracking-wider uppercase text-[11px]",
+      "tabular_nums": "tabular-nums tracking-normal font-mono"
+    }
+  },
+  "colors": {
+    "accent": "#1E293B",
+    "on_accent": "#FFFFFF",
+    "primary_indigo": "#1E3A8A",
+    "on_primary_indigo": "#FFFFFF",
+    "surfaces": [
+      {
+        "name": "page",
+        "kind": "solid",
+        "bg": "#F8FAFC",
+        "on_bg": "#0F172A",
+        "on_bg_muted": "#64748B",
+        "roles": {
+          "link": "#1E3A8A",
+          "error": "#DC2626",
+          "success": "#16A34A",
+          "warning": "#D97706"
+        }
+      },
+      {
+        "name": "panel",
+        "kind": "solid",
+        "bg": "#FFFFFF",
+        "on_bg": "#0F172A",
+        "on_bg_muted": "#64748B",
+        "roles": {
+          "link": "#1E3A8A",
+          "error": "#DC2626",
+          "success": "#16A34A",
+          "warning": "#D97706"
+        }
+      },
+      {
+        "name": "sidebar",
+        "kind": "solid",
+        "bg": "#0B132B",
+        "on_bg": "#F8FAFC",
+        "on_bg_muted": "#94A3B8",
+        "roles": {
+          "link": "#60A5FA",
+          "error": "#F87171",
+          "success": "#4ADE80",
+          "warning": "#FBBF24"
+        }
+      },
+      {
+        "name": "table_header",
+        "kind": "solid",
+        "bg": "#F1F5F9",
+        "on_bg": "#334155",
+        "on_bg_muted": "#64748B",
+        "roles": {
+          "link": "#1E3A8A",
+          "error": "#DC2626",
+          "success": "#16A34A"
+        }
+      },
+      {
+        "name": "table_row_hover",
+        "kind": "solid",
+        "bg": "#F8FAFC",
+        "on_bg": "#0F172A",
+        "on_bg_muted": "#475569"
+      },
+      {
+        "name": "table_row_selected",
+        "kind": "solid",
+        "bg": "#EFF6FF",
+        "on_bg": "#1E3A8A",
+        "on_bg_muted": "#3B82F6"
+      },
+      {
+        "name": "badge_success",
+        "kind": "solid",
+        "bg": "#DCFCE7",
+        "on_bg": "#15803D",
+        "on_bg_muted": "#166534"
+      },
+      {
+        "name": "badge_warning",
+        "kind": "solid",
+        "bg": "#FEF3C7",
+        "on_bg": "#B45309",
+        "on_bg_muted": "#92400E"
+      },
+      {
+        "name": "badge_danger",
+        "kind": "solid",
+        "bg": "#FEE2E2",
+        "on_bg": "#B91C1C",
+        "on_bg_muted": "#991B1B"
+      },
+      {
+        "name": "badge_info",
+        "kind": "solid",
+        "bg": "#DBEAFE",
+        "on_bg": "#1D4ED8",
+        "on_bg_muted": "#1E40AF"
+      },
+      {
+        "name": "badge_neutral",
+        "kind": "solid",
+        "bg": "#F1F5F9",
+        "on_bg": "#475569",
+        "on_bg_muted": "#64748B"
+      },
+      {
+        "name": "auth_card",
+        "kind": "solid",
+        "bg": "#FFFFFF",
+        "on_bg": "#0F172A",
+        "on_bg_muted": "#64748B",
+        "roles": {
+          "link": "#1E3A8A",
+          "error": "#DC2626",
+          "success": "#16A34A"
+        }
+      }
+    ]
+  },
+  "entry_surfaces": {
+    "/": "split dashboard — dark navy collapsible operations sidebar left, white card content area with KPI metric strip and dense operational requests grid right",
+    "/login": "branded split login — deep indigo positioning and security assurance panel left, white admin credentials form card right"
+  },
+  "layout_and_grids": {
+    "structure": "Fixed/collapsible left sidebar (240px expanded, 68px collapsed) + Sticky topbar (56px) + Scrollable main content viewport with max-width containment",
+    "sidebar_behavior": "Collapsible with icon-only tooltip mode on collapse, clear active indicator (left accent bar + high contrast text), grouped navigation items with subtle category labels",
+    "topbar_elements": [
+      "Collapsible trigger toggle",
+      "Dynamic Breadcrumb navigation (/ Section / Resource / Sub-view)",
+      "Global search input (with keyboard shortcut `Cmd+K` hint)",
+      "Quick action menu dropdown",
+      "Notification bell with pending review counter badge",
+      "Admin profile dropdown (Name, Role, Status, Sign Out)"
+    ],
+    "page_header_pattern": "Flex justify-between items-center mb-5 pb-3 border-b border-slate-200. Left: Page title with record count pill 'Available Records (524)' + subtitle. Right: Action buttons (Export CSV, Add New, Batch Operations).",
+    "table_control_toolbar": "Container bar above tables: Left has Search input + Status Filter tabs/dropdown + Saved Views selector. Right has Column visibility dropdown + Density toggle (Compact/Standard) + Refresh button.",
+    "bulk_action_bar": "Sticky bottom or floating animated pill when >=1 rows checked: displays count '{N} selected', Select All, Batch Approve, Batch Reject, Export Selected, Clear Selection buttons."
+  },
+  "table_design_system": {
+    "philosophy": "Enterprise logistics & operations density. Crisp 1px borders (#E2E8F0), no visual fluff. Right-aligned numbers, left-aligned text, centered status badges.",
+    "row_heights": {
+      "compact": "h-10 text-xs py-1.5",
+      "standard": "h-12 text-sm py-2.5"
+    },
+    "header_styling": "bg-slate-100/90 text-slate-700 font-semibold text-xs uppercase tracking-wider select-none border-b border-slate-300 px-3 py-2.5",
+    "zebra_and_states": {
+      "even_row": "bg-white",
+      "odd_row": "bg-slate-50/40",
+      "hover": "hover:bg-slate-100/80 transition-colors duration-150 cursor-pointer",
+      "selected": "bg-blue-50/90 font-medium text-slate-900 border-blue-200"
+    },
+    "checkbox_column": "w-10 text-center px-2",
+    "sorting_affordance": "Double-arrow icon for unsorted columns, up/down blue highlight arrow for active sort",
+    "pagination_bar": "Flex items-center justify-between px-4 py-3 border-t border-slate-200 bg-white text-xs text-slate-600. Left: 'Showing 1 to 25 of 524 entries' + Page size select dropdown (10, 25, 50, 100). Right: Numbered pagination buttons [Prev, 1, 2, 3 ... 21, Next]."
+  },
+  "partner_verification_workspace": {
+    "layout": "Two-column operational split view (70% main workspace + 30% sticky decision sidebar)",
+    "left_main_sections": [
+      "Partner Identity & Business Registration Info",
+      "Professional Certifications & Licenses",
+      "Offered Services & Pricing tier table",
+      "Service Portfolio / Image gallery",
+      "Uploaded Documents table (Government ID, Cosmetology License, Insurance Certificate, Background Check) with interactive Preview modal and per-document status tags (Pending, Under Review, Verified, Rejected)"
+    ],
+    "right_decision_sidebar": [
+      "Current Application Status summary card",
+      "Compliance Checklist (Interactive checks for ID, License, Address verification)",
+      "Admin Notes & Audit Timeline (Chronological log with timestamps)",
+      "Action Toolbar with distinct high-contrast controls: 'Approve Partner' (solid green), 'Request Correction' (amber outline with reason modal), 'Reject Application' (destructive red with reason selector)"
+    ]
+  },
+  "navigation_sections": [
+    {"name": "Dashboard", "path": "/dashboard", "icon": "LayoutDashboard", "badge": null},
+    {"name": "Customers", "path": "/customers", "icon": "Users", "badge": null},
+    {"name": "Partners", "path": "/partners", "icon": "Briefcase", "badge": null},
+    {"name": "Partner Verification", "path": "/partner-verification", "icon": "ShieldCheck", "badge": "12 Pending"},
+    {"name": "Services", "path": "/services", "icon": "Scissors", "badge": null},
+    {"name": "Bookings", "path": "/bookings", "icon": "CalendarCheck", "badge": "Live"},
+    {"name": "Payments", "path": "/payments", "icon": "CreditCard", "badge": null},
+    {"name": "Reviews", "path": "/reviews", "icon": "Star", "badge": null},
+    {"name": "Support & Disputes", "path": "/support", "icon": "Headphones", "badge": "4 Open"},
+    {"name": "Offers & Coupons", "path": "/offers", "icon": "Tag", "badge": null},
+    {"name": "Analytics", "path": "/analytics", "icon": "BarChart3", "badge": null},
+    {"name": "Notifications", "path": "/notifications", "icon": "Bell", "badge": "3"},
+    {"name": "Settings", "path": "/settings", "icon": "Settings", "badge": null}
+  ],
+  "motion": {
+    "page_transition": "Simple opacity fade 0.15s ease-out",
+    "drawer_transition": "Slide in from right 0.2s cubic-bezier(0.16, 1, 0.3, 1)",
+    "table_batch_bar": "Slide up from bottom with spring transition",
+    "hover_elements": "transition-colors duration-150 ease-in-out"
+  },
+  "accessibility": {
+    "wcag_level": "WCAG 2.1 AA Compliant (All text > 4.5:1 against surface)",
+    "table_semantics": "Native <table>, <thead>, <tbody>, <th> with scope='col', <td> elements",
+    "keyboard_navigation": "Full tab navigation through table rows, Esc to close modals/sheets, Enter to open row detail",
+    "data_testid_convention": "All interactive elements (buttons, inputs, filters, table headers, checkboxes, pagination controls, status badges) must provide kebab-case data-testid tags"
+  },
+  "image_urls": {
+    "admin_avatar": {
+      "url": "https://images.pexels.com/photos/20157010/pexels-photo-20157010.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+      "category": "Admin Profile / Topbar",
+      "description": "Executive portrait for primary admin user profile"
+    },
+    "partner_avatars": [
+      {
+        "url": "https://images.unsplash.com/photo-1581841064838-a470c740e8ee?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDk1ODB8MHwxfHNlYXJjaHwzfHxwcm9mZXNzaW9uYWwlMjBhdmF0YXIlMjBwb3J0cmFpdHxlbnwwfHx8fDE3ODgzNDIwMTB8MA&ixlib=rb-4.1.0&q=85",
+        "description": "Female beauty stylist avatar"
+      },
+      {
+        "url": "https://images.pexels.com/photos/30426363/pexels-photo-30426363.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+        "description": "Male hair stylist avatar"
+      }
+    ]
+  },
+  "UNIVERSAL GUIDELINES FOR MAIN AGENT": [
+    "Strictly avoid consumer beauty styling (no excessive hot pinks, pastel gradients, or glitter decorations). This is an enterprise operations console.",
+    "Use Manrope Variable for clean, modern sans-serif readability and IBM Plex Mono for IDs, currencies, dates, and tabular numbers.",
+    "Every table MUST have: Search toolbar, Filter dropdowns, Column sorting (with ascending/descending state), Bulk checkbox selection + Bulk action bar, Status badges, and Numbered pagination with page-size selector.",
+    "Implement real backend routes for seeded items with persistence so Approve/Reject, status changes, and filter queries work seamlessly.",
+    "Always include comprehensive data-testid attributes on buttons, links, inputs, and table rows for robust automated testing.",
+    "Keep contrast ratios high: Dark slate (#0F172A) on light gray (#F8FAFC / #FFFFFF) surfaces."
+  ]
+}
