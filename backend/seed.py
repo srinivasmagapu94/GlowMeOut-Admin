@@ -9,7 +9,6 @@ from __future__ import annotations
 import asyncio
 import random
 from datetime import date, datetime, timedelta, timezone
-
 from lib.auth import DEMO_ADMIN, hash_password
 from lib.db import client, db
 from models.schemas import (
@@ -130,6 +129,12 @@ def iso_dt(days_offset: int, hour: int = 10) -> str:
     return base.replace(hour=hour, minute=RNG.randint(0, 59), tzinfo=timezone.utc).isoformat(
         timespec="seconds"
     )
+
+
+def iso_hours_ago(hours: float) -> str:
+    """Timestamp `hours` in the past — lets seeded applications land on both sides
+    of the 48h verification SLA so the queue shows on-track/at-risk/breached."""
+    return (datetime.now(timezone.utc) - timedelta(hours=hours)).isoformat(timespec="seconds")
 
 
 def person() -> str:
@@ -331,7 +336,9 @@ def build_applications(partners, n=16):
                 },
                 status=status,
                 priority=weighted([("high", 3), ("medium", 5), ("low", 2)]),
-                submitted_at=iso_dt(-RNG.randint(2, 28), 11),
+                submitted_at=iso_hours_ago(
+                    RNG.choice([4.0, 9.0, 20.0, 27.0, 38.0, 44.0, 52.0, 71.0, 96.0, 150.0, 260.0, 420.0])
+                ),
                 updated_at=iso_dt(-RNG.randint(0, 3), 16),
                 decision_reason=(
                     "Licence number could not be validated with the issuing board."
@@ -631,6 +638,105 @@ def build_roles():
     ]
 
 
+def build_audit(customers, partners, applications, bookings, payments, offers, services, n=180):
+    """Backfill a believable admin history so the audit log has depth on day one."""
+    actors = [
+        ("Rehana Qureshi", "Super Admin"),
+        ("Nadia Farooqui", "Verification Analyst"),
+        ("Tomas Vega", "Operations Manager"),
+        ("Priya Balan", "Support Agent"),
+        ("Owen Whitaker", "Finance Controller"),
+        ("Chitra Menon", "Marketing Analyst"),
+    ]
+
+    templates = [
+        ("verification.approve", "Approved partner application", "application", "info"),
+        ("verification.reject", "Rejected application", "application", "warning"),
+        ("verification.request_correction", "Requested correction", "application", "warning"),
+        ("verification.document_verified", "Marked document verified", "application", "info"),
+        ("verification.note_added", "Added an admin note", "application", "info"),
+        ("partners.account_status_changed", "Set account status to suspended", "partners", "warning"),
+        ("partners.verification_status_changed", "Set verification status to verified", "partners", "info"),
+        ("customers.status_changed", "Set status to suspended", "customers", "warning"),
+        ("customers.segment_changed", "Set segment to VIP", "customers", "info"),
+        ("bookings.status_changed", "Set status to cancelled", "bookings", "warning"),
+        ("payments.status_changed", "Set status to refunded", "payments", "warning"),
+        ("payments.settlement_status_changed", "Set settlement status to settled", "payments", "info"),
+        ("reviews.status_changed", "Set status to removed", "reviews", "warning"),
+        ("offers.status_changed", "Set status to paused", "offers", "warning"),
+        ("offers.created", "Created coupon", "offers", "info"),
+        ("services.enabled_changed", "Set enabled to disabled", "services", "warning"),
+        ("services.created", "Created service", "services", "info"),
+        ("settings.platform_updated", "Updated platform configuration", "settings", "info"),
+        ("customers.exported", "Exported customers to CSV", "customers", "info"),
+        ("auth.signed_in", "Signed in to the console", "admin", "info"),
+    ]
+
+    details = {
+        "verification.reject": "Licence number could not be validated with the issuing board.",
+        "verification.request_correction": "Insurance certificate was illegible — asked for a clearer scan.",
+        "partners.account_status_changed": "Repeated late arrivals reported by three customers.",
+        "customers.status_changed": "Chargeback pattern flagged by the payments team.",
+        "bookings.status_changed": "Partner unavailable; customer offered a full refund.",
+        "payments.status_changed": "Service not delivered — refund authorised by finance.",
+        "reviews.status_changed": "Contained personal contact details.",
+        "settings.platform_updated": "commission 15.0% · payout Weekly · 2FA on · maintenance off",
+    }
+
+    rows = []
+    for i in range(n):
+        action, label, entity_type, severity = RNG.choice(templates)
+        actor_name, actor_role = RNG.choice(actors)
+
+        if entity_type == "application":
+            src = RNG.choice(applications)
+            entity_label, entity_id = f"{src['code']} · {src['business_name']}", src["id"]
+        elif entity_type == "partners":
+            src = RNG.choice(partners)
+            entity_label, entity_id = src["business_name"], src["id"]
+        elif entity_type == "customers":
+            src = RNG.choice(customers)
+            entity_label, entity_id = src["name"], src["id"]
+        elif entity_type == "bookings":
+            src = RNG.choice(bookings)
+            entity_label, entity_id = src["code"], src["id"]
+        elif entity_type == "payments":
+            src = RNG.choice(payments)
+            entity_label, entity_id = src["code"], src["id"]
+        elif entity_type == "offers":
+            src = RNG.choice(offers)
+            entity_label, entity_id = src["code"], src["id"]
+        elif entity_type == "services":
+            src = RNG.choice(services)
+            entity_label, entity_id = src["name"], src["id"]
+        elif entity_type == "settings":
+            entity_label, entity_id = "Platform configuration", ""
+        else:
+            entity_label, entity_id = actor_name, ""
+
+        if action == "customers.exported":
+            entity_label = f"{RNG.randint(25, 240)} rows"
+
+        rows.append(
+            {
+                "id": new_id(),
+                "at": iso_dt(-RNG.randint(0, 45), RNG.randint(7, 21)),
+                "actor_name": actor_name,
+                "actor_role": actor_role,
+                "action": action,
+                "action_label": label,
+                "entity_type": entity_type,
+                "entity_label": entity_label,
+                "entity_id": entity_id,
+                "detail": details.get(action, ""),
+                "severity": severity,
+            }
+        )
+
+    rows.sort(key=lambda r: r["at"], reverse=True)
+    return rows
+
+
 async def main() -> None:
     print("Seeding GlowMeOut admin data …")
 
@@ -645,6 +751,7 @@ async def main() -> None:
     offers = build_offers()
     notifications = build_notifications()
     roles = build_roles()
+    audit_log = build_audit(customers, partners, applications, bookings, payments, offers, services)
 
     # a few applications should map onto real partner records for the approve flow
     for app_row, partner in zip(applications[:6], partners[:6]):
@@ -663,6 +770,7 @@ async def main() -> None:
         "offers": offers,
         "notifications": notifications,
         "roles": roles,
+        "audit_log": audit_log,
     }
 
     for name, rows in collections.items():

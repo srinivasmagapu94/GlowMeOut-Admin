@@ -104,6 +104,23 @@ export interface Application {
   submitted_at: string;
   updated_at: string;
   decision_reason: string;
+  age_hours: number;
+  sla_state: string;
+  sla_due_in_hours: number;
+}
+
+export interface AuditEntry {
+  id: string;
+  at: string;
+  actor_name: string;
+  actor_role: string;
+  action: string;
+  action_label: string;
+  entity_type: string;
+  entity_label: string;
+  entity_id: string;
+  detail: string;
+  severity: string;
 }
 
 export interface ServiceItem {

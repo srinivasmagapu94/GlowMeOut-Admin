@@ -1,6 +1,6 @@
 // Partner verification queue — the entry point into the review workspace.
 import { useNavigate } from "react-router-dom";
-import { ShieldCheck } from "lucide-react";
+import { AlarmClock, ShieldCheck } from "lucide-react";
 import { DataTable, type Column } from "@/components/admin/DataTable";
 import { PageHeader, Panel } from "@/components/admin/PageShell";
 import { StatusBadge } from "@/components/admin/StatusBadge";
@@ -13,6 +13,40 @@ import type { Application } from "@/lib/types";
 function docSummary(app: Application) {
   const verified = app.documents.filter((d) => d.status === "verified").length;
   return `${verified}/${app.documents.length}`;
+}
+
+const SLA_LABELS: Record<string, string> = {
+  breached: "Breached",
+  at_risk: "At risk",
+  on_track: "On track",
+  closed: "Closed",
+};
+
+function fmtAge(hours: number): string {
+  if (hours < 1) return "<1h";
+  if (hours < 48) return `${Math.round(hours)}h`;
+  return `${Math.floor(hours / 24)}d ${Math.round(hours % 24)}h`;
+}
+
+export function SlaCell({ app, testid }: { app: Application; testid?: string }) {
+  const overdue = app.sla_state === "breached";
+  return (
+    <div className="whitespace-nowrap" data-testid={testid}>
+      <StatusBadge
+        status={overdue ? "danger" : app.sla_state === "at_risk" ? "warning" : app.sla_state === "closed" ? "neutral" : "success"}
+        label={SLA_LABELS[app.sla_state] ?? app.sla_state}
+        dot={!(app.sla_state === "closed")}
+      />
+      <p className="num mt-0.5 text-[10px] text-slate-500">
+        {fmtAge(app.age_hours)} old
+        {app.sla_state === "closed"
+          ? ""
+          : overdue
+            ? ` · ${fmtAge(Math.abs(app.sla_due_in_hours))} over`
+            : ` · ${fmtAge(Math.max(0, app.sla_due_in_hours))} left`}
+      </p>
+    </div>
+  );
 }
 
 export default function PartnerVerification() {
@@ -85,6 +119,12 @@ export default function PartnerVerification() {
       ),
     },
     {
+      key: "age_hours",
+      header: "SLA (48h target)",
+      sortable: true,
+      cell: (row) => <SlaCell app={row} testid={`verification-sla-${row.id}`} />,
+    },
+    {
       key: "status",
       header: "Status",
       sortable: true,
@@ -119,9 +159,20 @@ export default function PartnerVerification() {
         countLabel="applications"
         subtitle="Compliance review queue for new partner applications — identity, licensing, insurance and banking checks."
         actions={
-          <span className="hidden items-center gap-1.5 text-[11px] text-slate-500 sm:flex">
-            <ShieldCheck className="size-3.5" /> Decisions are written to the audit trail
-          </span>
+          <>
+            <span className="hidden items-center gap-1.5 text-[11px] text-slate-500 lg:flex">
+              <ShieldCheck className="size-3.5" /> Decisions are written to the audit trail
+            </span>
+            <Button
+              variant={state.sort === "urgency" ? "default" : "outline"}
+              size="sm"
+              className={state.sort === "urgency" ? "" : "bg-white"}
+              onClick={() => state.toggleSort("urgency")}
+              data-testid="verifications-sort-urgency"
+            >
+              <AlarmClock className="size-3.5" /> Sort by urgency
+            </Button>
+          </>
         }
         testid="partner-verification-header"
       />
@@ -143,6 +194,19 @@ export default function PartnerVerification() {
                 value={state.filters.status ?? "all"}
                 onChange={(value) => state.setFilter("status", value)}
                 options={facetOptions(facets?.status, "All statuses", titleCase)}
+              />
+              <FilterSelect
+                label="SLA"
+                testid="verifications-filter-sla"
+                value={state.filters.sla_state ?? "all"}
+                onChange={(value) => state.setFilter("sla_state", value)}
+                options={[
+                  { value: "all", label: "All SLA states" },
+                  { value: "breached", label: "Breached" },
+                  { value: "at_risk", label: "At risk" },
+                  { value: "on_track", label: "On track" },
+                  { value: "closed", label: "Closed" },
+                ]}
               />
               <FilterSelect
                 label="Priority"

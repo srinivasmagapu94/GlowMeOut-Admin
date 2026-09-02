@@ -127,6 +127,10 @@ class Application(BaseModel):
     submitted_at: str
     updated_at: str
     decision_reason: str = ""
+    # Computed server-side on read (never stored) — see routers/verification.py
+    age_hours: float = 0.0
+    sla_state: str = "on_track"
+    sla_due_in_hours: float = 0.0
 
 
 class DecisionRequest(BaseModel):
@@ -350,6 +354,21 @@ class AnalyticsOverview(BaseModel):
     rating_split: List[SlicePoint]
     range_label: str
     generated_at: str
+
+
+# ---------------------------------------------------------------- audit
+class AuditEntry(BaseModel):
+    id: str = Field(default_factory=new_id)
+    at: str
+    actor_name: str
+    actor_role: str
+    action: str
+    action_label: str
+    entity_type: str
+    entity_label: str = ""
+    entity_id: str = ""
+    detail: str = ""
+    severity: str = "info"
 
 
 # ---------------------------------------------------------------- settings

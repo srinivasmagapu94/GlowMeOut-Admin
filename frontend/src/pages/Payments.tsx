@@ -9,6 +9,7 @@ import { PageHeader, Panel } from "@/components/admin/PageShell";
 import { StatusBadge } from "@/components/admin/StatusBadge";
 import { FilterSelect, TableToolbar } from "@/components/admin/TableToolbar";
 import { apiGet, apiPatch } from "@/lib/api";
+import { downloadCsv } from "@/lib/download";
 import { fmtCompactMoney, fmtDateTime, fmtMoneyPrecise, fmtNumber, titleCase } from "@/lib/format";
 import { facetOptions, useFacets, useResourceList, useTableState } from "@/lib/table";
 import type { DashboardSummary, Payment } from "@/lib/types";
@@ -182,7 +183,10 @@ export default function Payments() {
             size="sm"
             className="bg-white"
             data-testid="payments-export-button"
-            onClick={() => toast.info("Reconciliation report queued")}
+            onClick={() => {
+              downloadCsv("payments", state.queryString);
+              toast.success("Export started — the CSV covers every row matching your filters");
+            }}
           >
             <Download className="size-3.5" /> Export ledger
           </Button>

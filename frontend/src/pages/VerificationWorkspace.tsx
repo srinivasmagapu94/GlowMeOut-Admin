@@ -374,6 +374,51 @@ export default function VerificationWorkspace() {
                 <span className="text-slate-500">Last updated</span>
                 <span className="num text-slate-700">{fmtRelative(app?.updated_at)}</span>
               </div>
+              {app ? (
+                <div
+                  className={
+                    app.sla_state === "breached"
+                      ? "rounded-md border border-red-200 bg-red-50 px-2.5 py-2"
+                      : app.sla_state === "at_risk"
+                        ? "rounded-md border border-amber-200 bg-amber-50 px-2.5 py-2"
+                        : "rounded-md border border-grid bg-secondary/50 px-2.5 py-2"
+                  }
+                  data-testid="verification-sla-panel"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="eyebrow text-slate-500">Response SLA (48h)</span>
+                    <StatusBadge
+                      status={
+                        app.sla_state === "breached"
+                          ? "danger"
+                          : app.sla_state === "at_risk"
+                            ? "warning"
+                            : app.sla_state === "closed"
+                              ? "neutral"
+                              : "success"
+                      }
+                      label={
+                        app.sla_state === "breached"
+                          ? "Breached"
+                          : app.sla_state === "at_risk"
+                            ? "At risk"
+                            : app.sla_state === "closed"
+                              ? "Closed"
+                              : "On track"
+                      }
+                      data-testid="verification-sla-state"
+                    />
+                  </div>
+                  <p className="num mt-1 text-[11px] text-slate-600">
+                    Waiting {Math.round(app.age_hours)}h
+                    {app.sla_state === "closed"
+                      ? " · decision recorded"
+                      : app.sla_due_in_hours < 0
+                        ? ` · ${Math.abs(Math.round(app.sla_due_in_hours))}h over target`
+                        : ` · ${Math.round(app.sla_due_in_hours)}h remaining`}
+                  </p>
+                </div>
+              ) : null}
               <div>
                 <div className="mb-1.5 flex items-center justify-between text-xs">
                   <span className="text-slate-500">Compliance progress</span>

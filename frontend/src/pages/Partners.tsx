@@ -16,6 +16,7 @@ import { PageHeader, Panel } from "@/components/admin/PageShell";
 import { StatusBadge } from "@/components/admin/StatusBadge";
 import { FilterSelect, TableToolbar } from "@/components/admin/TableToolbar";
 import { apiPatch, apiPost } from "@/lib/api";
+import { downloadCsv } from "@/lib/download";
 import { fmtDate, fmtMoney, fmtNumber, titleCase } from "@/lib/format";
 import { facetOptions, useFacets, useResourceList, useTableState } from "@/lib/table";
 import type { Partner } from "@/lib/types";
@@ -202,7 +203,10 @@ export default function Partners() {
             size="sm"
             className="bg-white"
             data-testid="partners-export-button"
-            onClick={() => toast.info("Export queued — the CSV will be emailed to you")}
+            onClick={() => {
+              downloadCsv("partners", state.queryString);
+              toast.success("Export started — the CSV covers every row matching your filters");
+            }}
           >
             <Download className="size-3.5" /> Export CSV
           </Button>

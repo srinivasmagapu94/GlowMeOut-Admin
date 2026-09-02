@@ -7,9 +7,10 @@ from typing import Any, Dict, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
+from lib.audit import record
 from lib.auth import current_admin
 from lib.db import db
-from lib.query import build_query, paginate
+from lib.query import build_query
 from models.schemas import (
     Application,
     DecisionRequest,
@@ -22,6 +23,40 @@ from models.schemas import (
 router = APIRouter(prefix="/verifications", dependencies=[Depends(current_admin)], tags=["verification"])
 
 SEARCH_FIELDS = ["code", "business_name", "owner_name", "email", "city"]
+
+# Response-time target for an application sitting in the queue.
+SLA_TARGET_HOURS = 48.0
+SLA_AT_RISK_HOURS = 36.0
+OPEN_STATUSES = {"pending", "under_review", "correction_requested"}
+
+
+def _sla_for(doc: Dict[str, Any]) -> Dict[str, Any]:
+    """Age an application and classify it against the response target.
+
+    Decided applications (verified/rejected) are 'closed' — they no longer consume SLA.
+    """
+    submitted = doc.get("submitted_at") or ""
+    try:
+        started = datetime.fromisoformat(submitted)
+        if started.tzinfo is None:
+            started = started.replace(tzinfo=timezone.utc)
+        age_hours = max(0.0, (datetime.now(timezone.utc) - started).total_seconds() / 3600.0)
+    except ValueError:
+        age_hours = 0.0
+
+    if doc.get("status") not in OPEN_STATUSES:
+        state = "closed"
+    elif age_hours >= SLA_TARGET_HOURS:
+        state = "breached"
+    elif age_hours >= SLA_AT_RISK_HOURS:
+        state = "at_risk"
+    else:
+        state = "on_track"
+
+    doc["age_hours"] = round(age_hours, 1)
+    doc["sla_state"] = state
+    doc["sla_due_in_hours"] = round(SLA_TARGET_HOURS - age_hours, 1)
+    return doc
 
 _ACTION_STATUS = {
     "approve": "verified",
@@ -50,6 +85,7 @@ async def list_applications(
     dir: str = "desc",
     page: int = 1,
     page_size: int = Query(default=25, ge=5, le=200),
+    sla_state: Optional[str] = None,
 ):
     filters: Dict[str, Any] = {}
     for name in ("status", "city", "priority"):
@@ -57,9 +93,29 @@ async def list_applications(
         if raw not in (None, "", "all"):
             filters[name] = raw
     query = build_query(q, SEARCH_FIELDS, filters)
-    return await paginate(
-        db.applications, query=query, sort_field=sort, sort_dir=dir, page=page, page_size=page_size
-    )
+
+    # SLA is computed, not stored, so enrich the whole matching set and then
+    # filter/sort/slice in Python. The verification queue is small by design.
+    docs = [_sla_for(d) for d in await db.applications.find(query, {"_id": 0}).to_list(length=1000)]
+
+    if sla_state not in (None, "", "all"):
+        docs = [d for d in docs if d["sla_state"] == sla_state]
+
+    reverse = dir == "desc"
+    if sort in ("age_hours", "sla_due_in_hours"):
+        docs.sort(key=lambda d: d.get(sort, 0.0), reverse=reverse)
+    elif sort == "urgency":
+        rank = {"breached": 0, "at_risk": 1, "on_track": 2, "closed": 3}
+        docs.sort(key=lambda d: (rank.get(d["sla_state"], 9), -d["age_hours"]))
+    else:
+        docs.sort(key=lambda d: str(d.get(sort, "")), reverse=reverse)
+
+    total = len(docs)
+    page = max(1, page)
+    start = (page - 1) * page_size
+    items = docs[start : start + page_size]
+    pages = max(1, (total + page_size - 1) // page_size)
+    return Page(items=items, total=total, page=page, page_size=page_size, pages=pages)
 
 
 @router.get("/facets")
@@ -68,6 +124,7 @@ async def facets():
         "status": sorted([v for v in await db.applications.distinct("status") if v]),
         "city": sorted([v for v in await db.applications.distinct("city") if v]),
         "priority": sorted([v for v in await db.applications.distinct("priority") if v]),
+        "sla_state": ["breached", "at_risk", "on_track", "closed"],
     }
 
 
@@ -75,7 +132,7 @@ async def _load(app_id: str) -> Dict[str, Any]:
     doc = await db.applications.find_one({"id": app_id}, {"_id": 0})
     if not doc:
         raise HTTPException(status_code=404, detail="Application not found")
-    return doc
+    return _sla_for(doc)
 
 
 @router.get("/{app_id}", response_model=Application)
@@ -110,18 +167,30 @@ async def decide(app_id: str, payload: DecisionRequest, admin=Depends(current_ad
         },
     )
 
+    doc = await _load(app_id)
     if payload.action == "approve":
-        doc = await _load(app_id)
         await db.partners.update_one(
             {"business_name": doc["business_name"]},
             {"$set": {"verification_status": "verified", "account_status": "active"}},
         )
 
-    return Application(**await _load(app_id))
+    await record(
+        actor=admin,
+        action=f"verification.{payload.action}",
+        action_label=_ACTION_LABEL[payload.action],
+        entity_type="application",
+        entity_label=f"{doc['code']} · {doc['business_name']}",
+        entity_id=app_id,
+        detail=payload.reason.strip() or payload.note.strip(),
+        severity="warning" if payload.action in ("reject", "request_correction") else "info",
+    )
+    return Application(**doc)
 
 
 @router.patch("/{app_id}/documents/{doc_id}", response_model=Application)
-async def set_document_status(app_id: str, doc_id: str, payload: DocumentStatusRequest):
+async def set_document_status(
+    app_id: str, doc_id: str, payload: DocumentStatusRequest, admin=Depends(current_admin)
+):
     allowed = {"pending", "under_review", "verified", "rejected"}
     if payload.status not in allowed:
         raise HTTPException(status_code=400, detail="Invalid document status")
@@ -131,7 +200,19 @@ async def set_document_status(app_id: str, doc_id: str, payload: DocumentStatusR
     )
     if result.matched_count == 0:
         raise HTTPException(status_code=404, detail="Document not found")
-    return Application(**await _load(app_id))
+    doc = await _load(app_id)
+    document = next((d for d in doc["documents"] if d["id"] == doc_id), {})
+
+    await record(
+        actor=admin,
+        action=f"verification.document_{payload.status}",
+        action_label=f"Marked document {payload.status.replace('_', ' ')}",
+        entity_type="application",
+        entity_label=f"{doc['code']} · {document.get('name', 'document')}",
+        entity_id=app_id,
+        severity="warning" if payload.status == "rejected" else "info",
+    )
+    return Application(**doc)
 
 
 @router.post("/{app_id}/notes", response_model=Application)
@@ -145,7 +226,17 @@ async def add_note(app_id: str, payload: NoteRequest, admin=Depends(current_admi
     await db.applications.update_one(
         {"id": app_id}, {"$push": {"notes": entry.model_dump()}, "$set": {"updated_at": _now()}}
     )
-    return Application(**await _load(app_id))
+    doc = await _load(app_id)
+    await record(
+        actor=admin,
+        action="verification.note_added",
+        action_label="Added an admin note",
+        entity_type="application",
+        entity_label=f"{doc['code']} · {doc['business_name']}",
+        entity_id=app_id,
+        detail=payload.text.strip()[:180],
+    )
+    return Application(**doc)
 
 
 @router.patch("/{app_id}/checklist/{key}", response_model=Application)

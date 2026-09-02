@@ -3,6 +3,7 @@ import { Toaster } from "@/components/ui/sonner";
 import AdminLayout from "@/components/admin/AdminLayout";
 import RequireAuth from "@/components/admin/RequireAuth";
 import Analytics from "@/pages/Analytics";
+import AuditLog from "@/pages/AuditLog";
 import Bookings from "@/pages/Bookings";
 import CustomerDetail from "@/pages/CustomerDetail";
 import Customers from "@/pages/Customers";
@@ -45,6 +46,7 @@ export default function App() {
             <Route path="/offers" element={<Offers />} />
             <Route path="/analytics" element={<Analytics />} />
             <Route path="/notifications" element={<Notifications />} />
+            <Route path="/audit" element={<AuditLog />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="*" element={<Navigate to="/dashboard" replace />} />
           </Route>

@@ -8,6 +8,7 @@ import {
   Headphones,
   LayoutDashboard,
   Scissors,
+  ScrollText,
   Settings,
   ShieldCheck,
   Star,
@@ -55,6 +56,7 @@ export const NAV_ITEMS: NavItem[] = [
     icon: Bell,
     group: "Administration",
   },
+  { label: "Audit Log", short: "Audit", path: "/audit", icon: ScrollText, group: "Administration" },
   { label: "Settings", short: "Settings", path: "/settings", icon: Settings, group: "Administration" },
 ];
 
