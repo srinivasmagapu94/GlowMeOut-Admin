@@ -11,6 +11,12 @@ export interface AdminUser {
   last_login: string | null;
 }
 
+export interface AdminLoginResponse {
+  adminUUID?: string;
+  validAdmin: boolean;
+  errorMessage?: string;
+}
+
 export interface PageResult<T> {
   items: T[];
   total: number;
@@ -53,6 +59,48 @@ export interface Partner {
   verification_status: string;
   joined_at: string;
   bio: string;
+}
+
+export interface PartnersApiRecord {
+  id?: string;
+  partnerUUID?: string;
+  partnerId?: string;
+  code?: string;
+  fullName?: string;
+  owner_name?: string;
+  ownerName?: string;
+  business_name?: string;
+  businessName?: string;
+  email?: string;
+  phone?: string;
+  phoneNumber?: string;
+  city?: string;
+  services?: string[];
+  categories?: string[];
+  rating?: number;
+  reviews_count?: number;
+  reviewsCount?: number;
+  jobs_completed?: number;
+  jobsCompleted?: number;
+  revenue?: number;
+  account_status?: string;
+  accountStatus?: string;
+  verification_status?: string;
+  verificationStatus?: string;
+  joined_at?: string;
+  onBoardingTimestamp?: string;
+  onboardingTimestamp?: string;
+  LastUpdateTimestamp?: string;
+  lastUpdateTimestamp?: string;
+}
+
+export interface PartnersResponse {
+  records: PartnersApiRecord[];
+  pageNumber: number;
+  pageSize: number;
+  sortBy: string;
+  sortDirection: string;
+  totalRecords: number;
 }
 
 export interface VerificationDocument {

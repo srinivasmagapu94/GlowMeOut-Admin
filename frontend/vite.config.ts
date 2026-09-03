@@ -71,6 +71,12 @@ export default defineConfig({
     // The /api proxy convention: frontend code calls relative /api/*, never an
     // absolute backend URL. Target is the FastAPI dev server (supervisor: backend).
     proxy: {
+      // Partner search is served by the marketplace API on port 8080.
+      "/api/ws_glowmeout_admin": {
+        target: "http://localhost:8080",
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api/, ""),
+      },
       "/api": {
         target: "http://localhost:8001",
         changeOrigin: true,

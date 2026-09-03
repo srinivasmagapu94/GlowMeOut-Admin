@@ -112,6 +112,25 @@ export default function VerificationWorkspace() {
       ),
   });
 
+  const approvePartner = useMutation({
+    mutationFn: () => apiPost<void>(`/ws_glowmeout_admin/approvePartner/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["partners"] });
+      queryClient.invalidateQueries({ queryKey: ["verifications"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+      setAction(null);
+      setReason("");
+      toast.success("Partner approved and activated");
+      navigate("/partners");
+    },
+    onError: (err) =>
+      toast.error(
+        err instanceof ApiError && err.status === 404
+          ? "Partner was not found"
+          : "Partner approval could not be completed",
+      ),
+  });
+
   const setDocStatus = useMutation({
     mutationFn: (vars: { docId: string; status: string }) =>
       apiPatch<Application>(`/verifications/${id}/documents/${vars.docId}`, {
@@ -451,7 +470,7 @@ export default function VerificationWorkspace() {
             <div className="space-y-2 p-4">
               <Button
                 className="w-full bg-emerald-600 text-white hover:bg-emerald-700"
-                disabled={decided || decide.isPending}
+                disabled={decided || decide.isPending || approvePartner.isPending}
                 onClick={() => {
                   setAction("approve");
                   setReason("");
@@ -463,7 +482,7 @@ export default function VerificationWorkspace() {
               <Button
                 variant="outline"
                 className="w-full border-amber-300 bg-white text-amber-700 hover:bg-amber-50"
-                disabled={decide.isPending}
+                disabled={decide.isPending || approvePartner.isPending}
                 onClick={() => {
                   setAction("request_correction");
                   setReason("");
@@ -475,7 +494,7 @@ export default function VerificationWorkspace() {
               <Button
                 variant="destructive"
                 className="w-full"
-                disabled={decided || decide.isPending}
+                disabled={decided || decide.isPending || approvePartner.isPending}
                 onClick={() => {
                   setAction("reject");
                   setReason("");
@@ -602,9 +621,18 @@ export default function VerificationWorkspace() {
             />
             <Button
               disabled={
-                decide.isPending || (action !== "approve" && !reason.trim())
+                decide.isPending ||
+                approvePartner.isPending ||
+                (action !== "approve" && !reason.trim())
               }
-              onClick={() => action && decide.mutate({ action, reason: reason.trim() })}
+              onClick={() => {
+                if (!action) return;
+                if (action === "approve") {
+                  approvePartner.mutate();
+                } else {
+                  decide.mutate({ action, reason: reason.trim() });
+                }
+              }}
               data-testid="verification-decision-confirm"
               className={
                 action === "reject"

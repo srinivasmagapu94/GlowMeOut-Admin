@@ -1,6 +1,6 @@
 // Partner management: same enterprise table pattern as customers, with rating and services.
 import { useNavigate } from "react-router-dom";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Ban, Briefcase, CheckCircle2, Download, MoreHorizontal, ShieldCheck, Star } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -15,18 +15,60 @@ import { DataTable, type Column } from "@/components/admin/DataTable";
 import { PageHeader, Panel } from "@/components/admin/PageShell";
 import { StatusBadge } from "@/components/admin/StatusBadge";
 import { FilterSelect, TableToolbar } from "@/components/admin/TableToolbar";
-import { apiPatch, apiPost } from "@/lib/api";
+import { apiGet, apiPatch, apiPost } from "@/lib/api";
 import { downloadCsv } from "@/lib/download";
 import { fmtDate, fmtMoney, fmtNumber, titleCase } from "@/lib/format";
-import { facetOptions, useFacets, useResourceList, useTableState } from "@/lib/table";
-import type { Partner } from "@/lib/types";
+import { facetOptions, useFacets, useTableState } from "@/lib/table";
+import type { Partner, PartnersApiRecord, PartnersResponse } from "@/lib/types";
+
+function toPartner(record: PartnersApiRecord): Partner {
+  const fullName = record.fullName ?? record.ownerName ?? record.owner_name ?? "—";
+  const phone = record.phoneNumber ?? record.phone ?? "—";
+  const onboarded =
+    record.onBoardingTimestamp ?? record.onboardingTimestamp ?? record.joined_at ?? "";
+
+  return {
+    id: record.id ?? record.partnerId ?? record.code ?? fullName,
+    code: record.code ?? record.partnerId ?? "—",
+    business_name: fullName,
+    owner_name: fullName,
+    email: record.email ?? "—",
+    phone,
+    city: record.city ?? "—",
+    services: record.categories ?? record.services ?? [],
+    rating: record.rating ?? 0,
+    reviews_count: record.reviewsCount ?? record.reviews_count ?? 0,
+    jobs_completed: record.jobsCompleted ?? record.jobs_completed ?? 0,
+    revenue: record.revenue ?? 0,
+    account_status: record.accountStatus ?? record.account_status ?? "active",
+    verification_status: record.verificationStatus ?? record.verification_status ?? "verified",
+    joined_at: onboarded,
+    bio: "",
+  };
+}
 
 export default function Partners() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const state = useTableState("joined_at", "desc");
+  const state = useTableState("onBoardingTimestamp", "desc");
 
-  const { data, isLoading, isError, refetch } = useResourceList<Partner>("partners", state);
+  const partnersQuery = useQuery({
+    queryKey: ["partners", "verified-active", state.queryKeyPart],
+    queryFn: () =>
+      apiGet<PartnersResponse>(
+        `/ws_glowmeout_admin/findVerifiedAndActivePartners?page=${state.page - 1}&page_size=${state.pageSize}&sort_by=${encodeURIComponent(state.sort)}&direction=${state.dir}`,
+      ),
+    placeholderData: (previous) => previous,
+  });
+  const data = partnersQuery.data
+    ? {
+        items: partnersQuery.data.records.map(toPartner),
+        total: partnersQuery.data.totalRecords,
+        page: partnersQuery.data.pageNumber + 1,
+        pages: Math.max(1, Math.ceil(partnersQuery.data.totalRecords / partnersQuery.data.pageSize)),
+      }
+    : undefined;
+  const { isLoading, isError, refetch } = partnersQuery;
   const { data: facets } = useFacets("partners");
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ["partners"] });
@@ -64,36 +106,21 @@ export default function Partners() {
       cell: (row) => <span className="num text-xs font-semibold text-primary">{row.code}</span>,
     },
     {
-      key: "business_name",
-      header: "Business",
+      key: "fullName",
+      header: "Fullname",
       sortable: true,
       cell: (row) => (
         <div className="min-w-0">
-          <p className="truncate text-[13px] font-semibold text-slate-900">{row.business_name}</p>
-          <p className="truncate text-[11px] text-slate-500">{row.owner_name} · {row.email}</p>
+          <p className="truncate text-[13px] font-semibold text-slate-900">{row.owner_name}</p>
+          <p className="truncate text-[11px] text-slate-500">{row.email}</p>
         </div>
       ),
     },
     {
-      key: "services",
-      header: "Services",
-      cell: (row) => (
-        <div className="flex flex-wrap gap-1">
-          {row.services.slice(0, 2).map((service) => (
-            <span
-              key={service}
-              className="rounded bg-secondary px-1.5 py-0.5 text-[10px] font-semibold text-slate-600"
-            >
-              {service}
-            </span>
-          ))}
-          {row.services.length > 2 ? (
-            <span className="num rounded bg-secondary px-1.5 py-0.5 text-[10px] font-semibold text-slate-500">
-              +{row.services.length - 2}
-            </span>
-          ) : null}
-        </div>
-      ),
+      key: "phone",
+      header: "PhoneNumber",
+      headClassName: "normal-case",
+      cell: (row) => <span className="num text-xs whitespace-nowrap">{row.phone}</span>,
     },
     { key: "city", header: "Location", sortable: true, cell: (row) => <span className="text-xs">{row.city}</span> },
     {
@@ -138,7 +165,7 @@ export default function Partners() {
       cell: (row) => <StatusBadge status={row.account_status} data-testid={`partner-account-${row.id}`} />,
     },
     {
-      key: "joined_at",
+      key: "LastUpdateTimestamp",
       header: "Onboarded",
       sortable: true,
       cell: (row) => <span className="num text-xs whitespace-nowrap">{fmtDate(row.joined_at)}</span>,
@@ -219,7 +246,7 @@ export default function Partners() {
           testid="partners"
           search={state.q}
           onSearch={state.setQ}
-          searchPlaceholder="Search business, owner, email or ID"
+          searchPlaceholder="Search fullname, email or ID"
           activeFilterCount={state.activeFilterCount}
           onReset={state.resetFilters}
           onRefresh={() => refetch()}

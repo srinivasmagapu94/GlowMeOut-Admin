@@ -1,14 +1,50 @@
 // Partner verification queue — the entry point into the review workspace.
 import { useNavigate } from "react-router-dom";
-import { AlarmClock, ShieldCheck } from "lucide-react";
+import { ShieldCheck } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
 import { DataTable, type Column } from "@/components/admin/DataTable";
 import { PageHeader, Panel } from "@/components/admin/PageShell";
 import { StatusBadge } from "@/components/admin/StatusBadge";
-import { FilterSelect, TableToolbar } from "@/components/admin/TableToolbar";
+import { TableToolbar } from "@/components/admin/TableToolbar";
 import { Button } from "@/components/ui/button";
-import { fmtDate, fmtRelative, titleCase } from "@/lib/format";
-import { facetOptions, useFacets, useResourceList, useTableState } from "@/lib/table";
-import type { Application } from "@/lib/types";
+import { fmtDate, fmtRelative } from "@/lib/format";
+import { apiGet } from "@/lib/api";
+import { useTableState } from "@/lib/table";
+import type { Application, PartnersApiRecord, PartnersResponse } from "@/lib/types";
+
+function toApplication(record: PartnersApiRecord): Application {
+  const name = record.fullName ?? record.ownerName ?? record.owner_name ?? "—";
+  const updated = record.LastUpdateTimestamp ?? record.lastUpdateTimestamp ?? "";
+  return {
+    id: record.partnerUUID ?? record.partnerId ?? record.id ?? record.code ?? name,
+    code: record.code ?? record.partnerId ?? record.id ?? "—",
+    business_name: record.businessName ?? record.business_name ?? name,
+    owner_name: name,
+    email: record.email ?? "—",
+    phone: record.phoneNumber ?? record.phone ?? "—",
+    city: record.city ?? "—",
+    address: "",
+    business_reg_no: "",
+    tax_id: "",
+    license_no: "",
+    experience_years: 0,
+    team_size: 0,
+    specialties: record.categories ?? record.services ?? [],
+    services: [],
+    portfolio: [],
+    documents: [],
+    notes: [],
+    checklist: {},
+    status: record.verificationStatus ?? record.verification_status ?? "under_review",
+    priority: "normal",
+    submitted_at: updated,
+    updated_at: updated,
+    decision_reason: "",
+    age_hours: 0,
+    sla_state: "on_track",
+    sla_due_in_hours: 0,
+  };
+}
 
 function docSummary(app: Application) {
   const verified = app.documents.filter((d) => d.status === "verified").length;
@@ -51,12 +87,23 @@ export function SlaCell({ app, testid }: { app: Application; testid?: string }) 
 
 export default function PartnerVerification() {
   const navigate = useNavigate();
-  const state = useTableState("submitted_at", "desc");
-  const { data, isLoading, isError, refetch } = useResourceList<Application>(
-    "verifications",
-    state,
-  );
-  const { data: facets } = useFacets("verifications");
+  const state = useTableState("LastUpdateTimestamp", "desc");
+  const { data: response, isLoading, isError, refetch } = useQuery({
+    queryKey: ["partners", "pending-verification", state.queryKeyPart],
+    queryFn: () =>
+      apiGet<PartnersResponse>(
+        `/ws_glowmeout_admin/findPendingVerificationPartners?page=${state.page - 1}&page_size=${state.pageSize}&sort_by=${encodeURIComponent(state.sort)}&direction=${state.dir}`,
+      ),
+    placeholderData: (previous) => previous,
+  });
+  const data = response
+    ? {
+        items: response.records.map(toApplication),
+        total: response.totalRecords,
+        page: response.pageNumber + 1,
+        pages: Math.max(1, Math.ceil(response.totalRecords / response.pageSize)),
+      }
+    : undefined;
 
   const columns: Column<Application>[] = [
     {
@@ -163,15 +210,6 @@ export default function PartnerVerification() {
             <span className="hidden items-center gap-1.5 text-[11px] text-slate-500 lg:flex">
               <ShieldCheck className="size-3.5" /> Decisions are written to the audit trail
             </span>
-            <Button
-              variant={state.sort === "urgency" ? "default" : "outline"}
-              size="sm"
-              className={state.sort === "urgency" ? "" : "bg-white"}
-              onClick={() => state.toggleSort("urgency")}
-              data-testid="verifications-sort-urgency"
-            >
-              <AlarmClock className="size-3.5" /> Sort by urgency
-            </Button>
           </>
         }
         testid="partner-verification-header"
@@ -186,44 +224,6 @@ export default function PartnerVerification() {
           activeFilterCount={state.activeFilterCount}
           onReset={state.resetFilters}
           onRefresh={() => refetch()}
-          filters={
-            <>
-              <FilterSelect
-                label="Status"
-                testid="verifications-filter-status"
-                value={state.filters.status ?? "all"}
-                onChange={(value) => state.setFilter("status", value)}
-                options={facetOptions(facets?.status, "All statuses", titleCase)}
-              />
-              <FilterSelect
-                label="SLA"
-                testid="verifications-filter-sla"
-                value={state.filters.sla_state ?? "all"}
-                onChange={(value) => state.setFilter("sla_state", value)}
-                options={[
-                  { value: "all", label: "All SLA states" },
-                  { value: "breached", label: "Breached" },
-                  { value: "at_risk", label: "At risk" },
-                  { value: "on_track", label: "On track" },
-                  { value: "closed", label: "Closed" },
-                ]}
-              />
-              <FilterSelect
-                label="Priority"
-                testid="verifications-filter-priority"
-                value={state.filters.priority ?? "all"}
-                onChange={(value) => state.setFilter("priority", value)}
-                options={facetOptions(facets?.priority, "All priorities", titleCase)}
-              />
-              <FilterSelect
-                label="City"
-                testid="verifications-filter-city"
-                value={state.filters.city ?? "all"}
-                onChange={(value) => state.setFilter("city", value)}
-                options={facetOptions(facets?.city, "All cities", (v) => v)}
-              />
-            </>
-          }
         />
 
         <DataTable
