@@ -103,6 +103,44 @@ export interface PartnersResponse {
   totalRecords: number;
 }
 
+export interface PartnerDetailsResponse {
+  accountStatus: string;
+  city: string;
+  createTimestamp: string;
+  emailAddress: string;
+  expirationTimestamp: string | null;
+  fullAddress: string;
+  fullName: string;
+  id: number;
+  lastUpdateTimestamp: string;
+  mobileNumber: string;
+  onBoardingTimestamp: string;
+  partnerBankDetails?: {
+    accountHolderName: string;
+    accountNumber: string;
+    bankName: string;
+    ifscCode: string;
+  } | null;
+  partnerKYC?: {
+    aadhaarNumber: string;
+    panNumber: string | null;
+  } | null;
+  partnerOnBoardingVerification?: {
+    comments: string;
+    isBankDetailsValidated: boolean;
+    isCertificateValidated: boolean;
+    isKYCValidated: boolean;
+    isProfileAccepted: boolean;
+    isProfileRejected: boolean;
+    lastUpdateTimestamp: string;
+  } | null;
+  partnerServiceType?: { serviceType: string }[];
+  partnerUUID: string;
+  pinCode: string;
+  state: string;
+  verificationStatus: string;
+}
+
 export interface VerificationDocument {
   id: string;
   name: string;

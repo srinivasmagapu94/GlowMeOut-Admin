@@ -32,7 +32,7 @@ import { FieldRow, PageHeader, Panel, PanelHeader } from "@/components/admin/Pag
 import { StatusBadge } from "@/components/admin/StatusBadge";
 import { ApiError, apiGet, apiPatch, apiPost } from "@/lib/api";
 import { fmtDateTime, fmtMoney, fmtRelative, titleCase } from "@/lib/format";
-import type { Application } from "@/lib/types";
+import type { Application, PartnerDetailsResponse } from "@/lib/types";
 
 const CHECKLIST_LABELS: Record<string, string> = {
   identity_verified: "Government ID matches applicant",
@@ -45,6 +45,80 @@ const CHECKLIST_LABELS: Record<string, string> = {
 const DOC_STATUSES = ["pending", "under_review", "verified", "rejected"];
 
 type DecisionAction = "approve" | "reject" | "request_correction";
+
+function mapPartnerDetails(partner: PartnerDetailsResponse): Application {
+  const verification = partner.partnerOnBoardingVerification;
+  const submittedAt = partner.createTimestamp;
+  const updatedAt = partner.lastUpdateTimestamp;
+  const ageHours = Math.max(0, (Date.now() - new Date(submittedAt).getTime()) / 3_600_000);
+  const documents = [
+    {
+      id: "kyc",
+      name: "KYC details",
+      doc_type: "kyc",
+      file_label: partner.partnerKYC?.aadhaarNumber ? "Aadhaar submitted" : "KYC details",
+      uploaded_at: submittedAt,
+      status: verification?.isKYCValidated ? "verified" : "pending",
+    },
+    {
+      id: "certificate",
+      name: "Certificate details",
+      doc_type: "certificate",
+      file_label: "Certificate validation",
+      uploaded_at: submittedAt,
+      status: verification?.isCertificateValidated ? "verified" : "pending",
+    },
+    {
+      id: "bank",
+      name: "Bank details",
+      doc_type: "bank",
+      file_label: partner.partnerBankDetails?.bankName ?? "Bank details",
+      uploaded_at: submittedAt,
+      status: verification?.isBankDetailsValidated ? "verified" : "pending",
+    },
+  ];
+
+  return {
+    id: partner.partnerUUID,
+    code: String(partner.id),
+    business_name: partner.fullName,
+    owner_name: partner.fullName,
+    email: partner.emailAddress,
+    phone: partner.mobileNumber,
+    city: partner.city,
+    address: `${partner.fullAddress}, ${partner.state} - ${partner.pinCode}`,
+    business_reg_no: "—",
+    tax_id: partner.partnerKYC?.panNumber ?? "—",
+    license_no: "—",
+    experience_years: 0,
+    team_size: 0,
+    specialties: (partner.partnerServiceType ?? []).map((service) => service.serviceType),
+    services: (partner.partnerServiceType ?? []).map((service) => ({
+      name: service.serviceType,
+      category: service.serviceType,
+      duration_min: 0,
+      price: 0,
+    })),
+    portfolio: [],
+    documents,
+    notes: verification?.comments
+      ? [{ id: "onboarding", author: "Partner", text: verification.comments, created_at: updatedAt, kind: "system" }]
+      : [],
+    checklist: {
+      identity_verified: verification?.isKYCValidated ?? false,
+      licence_validated: verification?.isCertificateValidated ?? false,
+      bank_details_matched: verification?.isBankDetailsValidated ?? false,
+    },
+    status: partner.verificationStatus.toLowerCase(),
+    priority: "normal",
+    submitted_at: submittedAt,
+    updated_at: updatedAt,
+    decision_reason: verification?.comments ?? "",
+    age_hours: ageHours,
+    sla_state: "on_track",
+    sla_due_in_hours: Math.max(0, 48 - ageHours),
+  };
+}
 
 const DECISION_COPY: Record<DecisionAction, { title: string; description: string; cta: string }> = {
   approve: {
@@ -79,7 +153,10 @@ export default function VerificationWorkspace() {
   const queryKey = ["verifications", "detail", id];
   const { data: app, isError } = useQuery({
     queryKey,
-    queryFn: () => apiGet<Application>(`/verifications/${id}`),
+    queryFn: async () =>
+      mapPartnerDetails(
+        await apiGet<PartnerDetailsResponse>(`/ws_glowmeout_admin/getPartnerDetailsByUUID/${id}`),
+      ),
     retry: false,
   });
 
