@@ -69,16 +69,16 @@ export default defineConfig({
     hmr: !hotReloadDisabled,
     watch: hotReloadDisabled ? null : { usePolling: true, interval: 300 },
     // The /api proxy convention: frontend code calls relative /api/*, never an
-    // absolute backend URL. Target is the FastAPI dev server (supervisor: backend).
+    // absolute backend URL. Target is the Spring Boot backend on port 8082.
     proxy: {
-      // Partner search is served by the marketplace API on port 8080.
+      // Spring Boot partner endpoints do not include the frontend's /api prefix.
       "/api/ws_glowmeout_admin": {
-        target: "http://localhost:8080",
+        target: "http://localhost:8082",
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api/, ""),
       },
       "/api": {
-        target: "http://localhost:8001",
+        target: "http://localhost:8082",
         changeOrigin: true,
       },
     },

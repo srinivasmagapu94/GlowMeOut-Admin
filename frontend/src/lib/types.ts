@@ -121,6 +121,27 @@ export interface PartnerDetailsResponse {
     bankName: string;
     ifscCode: string;
   } | null;
+  partnerDocuments?: {
+    id?: string | number;
+    partnerDocumentUUID?: string;
+    documentType?: string;
+    document_type?: string;
+    name?: string;
+    documentName?: string;
+    fileLabel?: string;
+    file_label?: string;
+    documentUrl?: string;
+    documentURL?: string;
+    fileUrl?: string;
+    fileURL?: string;
+    url?: string;
+    createTimestamp?: string;
+    uploadedAt?: string;
+    uploadTimestamp?: string;
+    expirationTimestamp?: string | null;
+    lastUpdateTimestamp?: string;
+    status?: string;
+  }[] | null;
   partnerKYC?: {
     aadhaarNumber: string;
     panNumber: string | null;
@@ -146,6 +167,7 @@ export interface VerificationDocument {
   name: string;
   doc_type: string;
   file_label: string;
+  url?: string;
   uploaded_at: string;
   status: string;
 }

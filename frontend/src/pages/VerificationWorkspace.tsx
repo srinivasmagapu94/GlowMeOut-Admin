@@ -8,6 +8,7 @@ import {
   CircleSlash,
   Clock,
   Eye,
+  ExternalLink,
   FileText,
   MessageSquarePlus,
   PencilLine,
@@ -51,7 +52,7 @@ function mapPartnerDetails(partner: PartnerDetailsResponse): Application {
   const submittedAt = partner.createTimestamp;
   const updatedAt = partner.lastUpdateTimestamp;
   const ageHours = Math.max(0, (Date.now() - new Date(submittedAt).getTime()) / 3_600_000);
-  const documents = [
+  const fallbackDocuments = [
     {
       id: "kyc",
       name: "KYC details",
@@ -77,6 +78,29 @@ function mapPartnerDetails(partner: PartnerDetailsResponse): Application {
       status: verification?.isBankDetailsValidated ? "verified" : "pending",
     },
   ];
+  const documents =
+    partner.partnerDocuments && partner.partnerDocuments.length > 0
+      ? partner.partnerDocuments.map((document, index) => ({
+          id: String(document.partnerDocumentUUID ?? document.id ?? document.documentType ?? index),
+          name: document.name ?? document.documentName ?? titleCase(document.documentType ?? document.document_type),
+          doc_type: document.documentType ?? document.document_type ?? "document",
+          file_label:
+            document.fileLabel ??
+            document.file_label ??
+            document.documentName ??
+            document.name ??
+            "Uploaded document",
+          url:
+            document.documentUrl ??
+            document.documentURL ??
+            document.fileUrl ??
+            document.fileURL ??
+            document.url,
+          uploaded_at:
+            document.createTimestamp ?? document.uploadedAt ?? document.uploadTimestamp ?? submittedAt,
+          status: (document.status ?? "pending").toLowerCase(),
+        }))
+      : fallbackDocuments;
 
   return {
     id: partner.partnerUUID,
@@ -426,10 +450,19 @@ export default function VerificationWorkspace() {
                     <FileText className="size-4" />
                   </span>
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-[13px] font-semibold text-slate-800">{doc.name}</p>
-                    <p className="num truncate text-[11px] text-slate-500">
-                      {doc.file_label} · uploaded {fmtRelative(doc.uploaded_at)}
-                    </p>
+                    <p className="truncate text-[13px] font-semibold text-slate-800">{titleCase(doc.doc_type)}</p>
+                    {doc.url ? (
+                      <a
+                        href={doc.url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="mt-1 inline-flex max-w-full items-center gap-1 text-[11px] font-semibold text-primary hover:underline"
+                        data-testid={`verification-document-${doc.id}-link`}
+                      >
+                        <ExternalLink className="size-3 shrink-0" />
+                        <span className="truncate">Open document</span>
+                      </a>
+                    ) : null}
                   </div>
                   <StatusBadge status={doc.status} data-testid={`verification-document-status-${doc.id}`} />
                   <div className="flex items-center gap-1">
