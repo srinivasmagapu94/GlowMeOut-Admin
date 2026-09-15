@@ -43,7 +43,7 @@ const CHECKLIST_LABELS: Record<string, string> = {
   background_check_clear: "Background check returned clear",
 };
 
-const DOC_STATUSES = ["pending", "under_review", "verified", "rejected"];
+const DOC_STATUSES = ["pending", "verified", "rejected"];
 
 type DecisionAction = "approve" | "reject" | "request_correction";
 
@@ -52,6 +52,17 @@ function mapPartnerDetails(partner: PartnerDetailsResponse): Application {
   const submittedAt = partner.createTimestamp;
   const updatedAt = partner.lastUpdateTimestamp;
   const ageHours = Math.max(0, (Date.now() - new Date(submittedAt).getTime()) / 3_600_000);
+  const documentStatus = (documentType: string) => {
+    const type = documentType.trim().toUpperCase();
+    if (type === "KYC") return verification?.isKYCValidated ? "verified" : "pending";
+    if (type === "CERTIFICATE") {
+      return verification?.isCertificateValidated ? "verified" : "pending";
+    }
+    if (["BANK", "BANKDOCUMENT", "BANKDOCUMENTS"].includes(type)) {
+      return verification?.isBankDetailsValidated ? "verified" : "pending";
+    }
+    return "pending";
+  };
   const fallbackDocuments = [
     {
       id: "kyc",
@@ -59,7 +70,7 @@ function mapPartnerDetails(partner: PartnerDetailsResponse): Application {
       doc_type: "kyc",
       file_label: partner.partnerKYC?.aadhaarNumber ? "Aadhaar submitted" : "KYC details",
       uploaded_at: submittedAt,
-      status: verification?.isKYCValidated ? "verified" : "pending",
+      status: documentStatus("KYC"),
     },
     {
       id: "certificate",
@@ -67,7 +78,7 @@ function mapPartnerDetails(partner: PartnerDetailsResponse): Application {
       doc_type: "certificate",
       file_label: "Certificate validation",
       uploaded_at: submittedAt,
-      status: verification?.isCertificateValidated ? "verified" : "pending",
+      status: documentStatus("CERTIFICATE"),
     },
     {
       id: "bank",
@@ -75,14 +86,18 @@ function mapPartnerDetails(partner: PartnerDetailsResponse): Application {
       doc_type: "bank",
       file_label: partner.partnerBankDetails?.bankName ?? "Bank details",
       uploaded_at: submittedAt,
-      status: verification?.isBankDetailsValidated ? "verified" : "pending",
+      status: documentStatus("BANK"),
     },
   ];
   const documents =
     partner.partnerDocuments && partner.partnerDocuments.length > 0
       ? partner.partnerDocuments.map((document, index) => ({
           id: String(document.partnerDocumentUUID ?? document.id ?? document.documentType ?? index),
-          name: document.name ?? document.documentName ?? titleCase(document.documentType ?? document.document_type),
+          document_uuid: document.partnerDocumentUUID,
+          name:
+            document.name ??
+            document.documentName ??
+            titleCase(document.documentType ?? document.document_type),
           doc_type: document.documentType ?? document.document_type ?? "document",
           file_label:
             document.fileLabel ??
@@ -98,7 +113,7 @@ function mapPartnerDetails(partner: PartnerDetailsResponse): Application {
             document.url,
           uploaded_at:
             document.createTimestamp ?? document.uploadedAt ?? document.uploadTimestamp ?? submittedAt,
-          status: (document.status ?? "pending").toLowerCase(),
+          status: document.status?.toLowerCase() ?? documentStatus(document.documentType ?? document.document_type ?? ""),
         }))
       : fallbackDocuments;
 
@@ -233,15 +248,45 @@ export default function VerificationWorkspace() {
   });
 
   const setDocStatus = useMutation({
-    mutationFn: (vars: { docId: string; status: string }) =>
-      apiPatch<Application>(`/verifications/${id}/documents/${vars.docId}`, {
-        status: vars.status,
+    mutationFn: (vars: {
+      certificateUUID: string;
+      documentType: string;
+      status: "verified" | "rejected";
+    }) =>
+      apiPost<void>("/ws_glowmeout_admin/approveORRejectCertificate", {
+        partnerUUID: app?.id,
+        certificateUUID: vars.certificateUUID,
+        isApproved: vars.status === "verified",
+        documentType: vars.documentType.trim().toUpperCase(),
+        comments: "",
       }),
-    onSuccess: (updated, vars) => {
-      onSettled(updated);
+    onMutate: async (vars) => {
+      await queryClient.cancelQueries({ queryKey });
+      const previous = queryClient.getQueryData<Application>(queryKey);
+      queryClient.setQueryData<Application>(queryKey, (current) =>
+        current
+          ? {
+              ...current,
+              documents: current.documents.map((document) =>
+                document.document_uuid === vars.certificateUUID
+                  ? { ...document, status: vars.status }
+                  : document,
+              ),
+            }
+          : current,
+      );
+      return { previous };
+    },
+    onSuccess: (_result, vars) => {
+      queryClient.invalidateQueries({ queryKey });
       toast.success(`Document marked ${titleCase(vars.status).toLowerCase()}`);
     },
-    onError: () => toast.error("Could not update this document"),
+    onError: (_error, _vars, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(queryKey, context.previous);
+      }
+      toast.error("Could not update this document");
+    },
   });
 
   const toggleCheck = useMutation({
@@ -472,7 +517,18 @@ export default function VerificationWorkspace() {
                         size="xs"
                         variant={doc.status === status ? "default" : "outline"}
                         disabled={setDocStatus.isPending}
-                        onClick={() => setDocStatus.mutate({ docId: doc.id, status })}
+                        onClick={() => {
+                          if (
+                            doc.document_uuid &&
+                            (status === "verified" || status === "rejected")
+                          ) {
+                            setDocStatus.mutate({
+                              certificateUUID: doc.document_uuid,
+                              documentType: doc.doc_type,
+                              status,
+                            });
+                          }
+                        }}
                         data-testid={`verification-doc-${doc.id}-set-${status}`}
                         className={doc.status === status ? "" : "bg-white"}
                       >

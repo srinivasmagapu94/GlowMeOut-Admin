@@ -164,6 +164,7 @@ export interface PartnerDetailsResponse {
 
 export interface VerificationDocument {
   id: string;
+  document_uuid?: string;
   name: string;
   doc_type: string;
   file_label: string;
