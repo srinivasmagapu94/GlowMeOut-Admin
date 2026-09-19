@@ -1,5 +1,5 @@
 // Typed fetch layer over the FastAPI backend. Base is the relative "/api" prefix so the
-// same code works in dev (Vite proxies /api → :8001) and behind a single origin in prod.
+// Requests stay same-origin in the browser; Vite routes them to the correct backend.
 const BASE = "/api";
 
 // Fields are declared, not constructor parameter properties: tsconfig sets
@@ -39,7 +39,8 @@ async function request<T>(method: string, path: string, body?: JsonBody): Promis
 // The response type is yours to declare: nothing infers across the Python boundary, so a
 // TS interface here mirrors the endpoint's Pydantic model by hand — keep the two in sync.
 export const apiGet = <T>(path: string) => request<T>("GET", path);
-export const apiPost = <T>(path: string, body?: JsonBody) => request<T>("POST", path, body ?? null);
+export const apiPost = <T>(path: string, body?: JsonBody) =>
+  request<T>("POST", path, body);
 export const apiPut = <T>(path: string, body?: JsonBody) => request<T>("PUT", path, body ?? null);
 export const apiPatch = <T>(path: string, body?: JsonBody) =>
   request<T>("PATCH", path, body ?? null);

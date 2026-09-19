@@ -20,7 +20,7 @@ Two separate processes, managed by supervisor in the pod (see "Pod conventions"
 below); to run them by hand from two terminals instead:
 
 ```bash
-cd backend && uvicorn server:app --host 0.0.0.0 --port 8001 --reload   # http://localhost:8001
+cd backend && uvicorn server:app --host 0.0.0.0 --port 8082 --reload   # http://localhost:8082
 cd frontend && yarn dev                                                # http://localhost:3000
 ```
 
@@ -28,7 +28,7 @@ cd frontend && yarn dev                                                # http://
 
 Every backend route lives under `/api` (the backend mounts one
 `APIRouter(prefix="/api")`), and the frontend dev server
-(`frontend/vite.config.ts`) proxies `/api/*` to `http://localhost:8001`. So
+(`frontend/vite.config.ts`) proxies `/api/*` to `http://localhost:8082`. So
 frontend code always calls a **relative** path — `apiGet("/status")` →
 `/api/status` — and never an absolute backend URL. The same code works in dev
 (via the Vite proxy) and in production (once both are served behind a single
@@ -154,7 +154,7 @@ already parallel — do not pass your own `-n`) and `asyncio_mode = auto` (so
 `-p no:xdist` (that errors, because `addopts` still passes `-n`/`--dist`).
 `backend/tests/conftest.py` is pre-scaffolded — a sync `client` fixture
 (`httpx.Client` rooted at `/api`), an async `aclient`, and an `api_url()` helper,
-all pointed at `BACKEND_URL` (default `http://localhost:8001`). Tests hit the
+all pointed at `BACKEND_URL` (default `http://localhost:8082`). Tests hit the
 live uvicorn process, so the app under test is the one the browser sees. Add
 app-specific fixtures below the marker; do not re-create the file.
 
@@ -186,7 +186,7 @@ local-run instructions above.
   `/var/log/supervisor/backend.err.log`, `backend.out.log`,
   `frontend.err.log`.
 - App in a browser: the pod's preview URL (frontend, port `3000`). Backend API
-  directly at port `8001`.
+  directly at port `8082`.
 - `mongod` runs locally in the pod (`--bind_ip_all`); `MONGO_URL` in
   `backend/.env` points at `localhost`, no separate Mongo container.
 - Both dev servers hot-reload on file edits (uvicorn `--reload` for the backend,

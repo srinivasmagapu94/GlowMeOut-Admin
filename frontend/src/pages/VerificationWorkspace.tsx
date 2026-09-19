@@ -8,6 +8,7 @@ import {
   CircleSlash,
   Clock,
   Eye,
+  ExternalLink,
   FileText,
   MessageSquarePlus,
   PencilLine,
@@ -32,7 +33,7 @@ import { FieldRow, PageHeader, Panel, PanelHeader } from "@/components/admin/Pag
 import { StatusBadge } from "@/components/admin/StatusBadge";
 import { ApiError, apiGet, apiPatch, apiPost } from "@/lib/api";
 import { fmtDateTime, fmtMoney, fmtRelative, titleCase } from "@/lib/format";
-import type { Application } from "@/lib/types";
+import type { Application, PartnerDetailsResponse } from "@/lib/types";
 
 const CHECKLIST_LABELS: Record<string, string> = {
   identity_verified: "Government ID matches applicant",
@@ -42,9 +43,121 @@ const CHECKLIST_LABELS: Record<string, string> = {
   background_check_clear: "Background check returned clear",
 };
 
-const DOC_STATUSES = ["pending", "under_review", "verified", "rejected"];
+const DOC_STATUSES = ["pending", "verified", "rejected"];
 
 type DecisionAction = "approve" | "reject" | "request_correction";
+
+function mapPartnerDetails(partner: PartnerDetailsResponse): Application {
+  const verification = partner.partnerOnBoardingVerification;
+  const submittedAt = partner.createTimestamp;
+  const updatedAt = partner.lastUpdateTimestamp;
+  const ageHours = Math.max(0, (Date.now() - new Date(submittedAt).getTime()) / 3_600_000);
+  const documentStatus = (documentType: string) => {
+    const type = documentType.trim().toUpperCase();
+    if (type === "KYC") return verification?.isKYCValidated ? "verified" : "pending";
+    if (type === "CERTIFICATE") {
+      return verification?.isCertificateValidated ? "verified" : "pending";
+    }
+    if (["BANK", "BANKDOCUMENT", "BANKDOCUMENTS"].includes(type)) {
+      return verification?.isBankDetailsValidated ? "verified" : "pending";
+    }
+    return "pending";
+  };
+  const fallbackDocuments = [
+    {
+      id: "kyc",
+      name: "KYC details",
+      doc_type: "kyc",
+      file_label: partner.partnerKYC?.aadhaarNumber ? "Aadhaar submitted" : "KYC details",
+      uploaded_at: submittedAt,
+      status: documentStatus("KYC"),
+    },
+    {
+      id: "certificate",
+      name: "Certificate details",
+      doc_type: "certificate",
+      file_label: "Certificate validation",
+      uploaded_at: submittedAt,
+      status: documentStatus("CERTIFICATE"),
+    },
+    {
+      id: "bank",
+      name: "Bank details",
+      doc_type: "bank",
+      file_label: partner.partnerBankDetails?.bankName ?? "Bank details",
+      uploaded_at: submittedAt,
+      status: documentStatus("BANK"),
+    },
+  ];
+  const documents =
+    partner.partnerDocuments && partner.partnerDocuments.length > 0
+      ? partner.partnerDocuments.map((document, index) => ({
+          id: String(document.partnerDocumentUUID ?? document.id ?? document.documentType ?? index),
+          document_uuid: document.partnerDocumentUUID,
+          name:
+            document.name ??
+            document.documentName ??
+            titleCase(document.documentType ?? document.document_type),
+          doc_type: document.documentType ?? document.document_type ?? "document",
+          file_label:
+            document.fileLabel ??
+            document.file_label ??
+            document.documentName ??
+            document.name ??
+            "Uploaded document",
+          url:
+            document.documentUrl ??
+            document.documentURL ??
+            document.fileUrl ??
+            document.fileURL ??
+            document.url,
+          uploaded_at:
+            document.createTimestamp ?? document.uploadedAt ?? document.uploadTimestamp ?? submittedAt,
+          status: document.status?.toLowerCase() ?? documentStatus(document.documentType ?? document.document_type ?? ""),
+        }))
+      : fallbackDocuments;
+
+  return {
+    id: partner.partnerUUID,
+    code: String(partner.id),
+    business_name: partner.fullName,
+    owner_name: partner.fullName,
+    email: partner.emailAddress,
+    phone: partner.mobileNumber,
+    city: partner.city,
+    address: `${partner.fullAddress}, ${partner.state} - ${partner.pinCode}`,
+    business_reg_no: "—",
+    tax_id: partner.partnerKYC?.panNumber ?? "—",
+    license_no: "—",
+    experience_years: 0,
+    team_size: 0,
+    specialties: (partner.partnerServiceType ?? []).map((service) => service.serviceType),
+    services: (partner.partnerServiceType ?? []).map((service) => ({
+      name: service.serviceType,
+      category: service.serviceType,
+      duration_min: 0,
+      price: 0,
+    })),
+    portfolio: [],
+    documents,
+    notes: verification?.comments
+      ? [{ id: "onboarding", author: "Partner", text: verification.comments, created_at: updatedAt, kind: "system" }]
+      : [],
+    checklist: {
+      identity_verified: verification?.isKYCValidated ?? false,
+      licence_validated: verification?.isCertificateValidated ?? false,
+      bank_details_matched: verification?.isBankDetailsValidated ?? false,
+    },
+    status: partner.verificationStatus.toLowerCase(),
+    priority: "normal",
+    submitted_at: submittedAt,
+    updated_at: updatedAt,
+    decision_reason: verification?.comments ?? "",
+    age_hours: ageHours,
+    sla_state: "on_track",
+    sla_due_in_hours: Math.max(0, 48 - ageHours),
+  };
+}
 
 const DECISION_COPY: Record<DecisionAction, { title: string; description: string; cta: string }> = {
   approve: {
@@ -79,7 +192,10 @@ export default function VerificationWorkspace() {
   const queryKey = ["verifications", "detail", id];
   const { data: app, isError } = useQuery({
     queryKey,
-    queryFn: () => apiGet<Application>(`/verifications/${id}`),
+    queryFn: async () =>
+      mapPartnerDetails(
+        await apiGet<PartnerDetailsResponse>(`/ws_glowmeout_admin/getPartnerDetailsByUUID/${id}`),
+      ),
     retry: false,
   });
 
@@ -112,16 +228,65 @@ export default function VerificationWorkspace() {
       ),
   });
 
+  const approvePartner = useMutation({
+    mutationFn: () => apiPost<void>(`/ws_glowmeout_admin/approvePartner/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["partners"] });
+      queryClient.invalidateQueries({ queryKey: ["verifications"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+      setAction(null);
+      setReason("");
+      toast.success("Partner approved and activated");
+      navigate("/partners");
+    },
+    onError: (err) =>
+      toast.error(
+        err instanceof ApiError && err.status === 404
+          ? "Partner was not found"
+          : "Partner approval could not be completed",
+      ),
+  });
+
   const setDocStatus = useMutation({
-    mutationFn: (vars: { docId: string; status: string }) =>
-      apiPatch<Application>(`/verifications/${id}/documents/${vars.docId}`, {
-        status: vars.status,
+    mutationFn: (vars: {
+      certificateUUID: string;
+      documentType: string;
+      status: "verified" | "rejected";
+    }) =>
+      apiPost<void>("/ws_glowmeout_admin/approveORRejectCertificate", {
+        partnerUUID: app?.id,
+        certificateUUID: vars.certificateUUID,
+        isApproved: vars.status === "verified",
+        documentType: vars.documentType.trim().toUpperCase(),
+        comments: "",
       }),
-    onSuccess: (updated, vars) => {
-      onSettled(updated);
+    onMutate: async (vars) => {
+      await queryClient.cancelQueries({ queryKey });
+      const previous = queryClient.getQueryData<Application>(queryKey);
+      queryClient.setQueryData<Application>(queryKey, (current) =>
+        current
+          ? {
+              ...current,
+              documents: current.documents.map((document) =>
+                document.document_uuid === vars.certificateUUID
+                  ? { ...document, status: vars.status }
+                  : document,
+              ),
+            }
+          : current,
+      );
+      return { previous };
+    },
+    onSuccess: (_result, vars) => {
+      queryClient.invalidateQueries({ queryKey });
       toast.success(`Document marked ${titleCase(vars.status).toLowerCase()}`);
     },
-    onError: () => toast.error("Could not update this document"),
+    onError: (_error, _vars, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(queryKey, context.previous);
+      }
+      toast.error("Could not update this document");
+    },
   });
 
   const toggleCheck = useMutation({
@@ -330,10 +495,19 @@ export default function VerificationWorkspace() {
                     <FileText className="size-4" />
                   </span>
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-[13px] font-semibold text-slate-800">{doc.name}</p>
-                    <p className="num truncate text-[11px] text-slate-500">
-                      {doc.file_label} · uploaded {fmtRelative(doc.uploaded_at)}
-                    </p>
+                    <p className="truncate text-[13px] font-semibold text-slate-800">{titleCase(doc.doc_type)}</p>
+                    {doc.url ? (
+                      <a
+                        href={doc.url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="mt-1 inline-flex max-w-full items-center gap-1 text-[11px] font-semibold text-primary hover:underline"
+                        data-testid={`verification-document-${doc.id}-link`}
+                      >
+                        <ExternalLink className="size-3 shrink-0" />
+                        <span className="truncate">Open document</span>
+                      </a>
+                    ) : null}
                   </div>
                   <StatusBadge status={doc.status} data-testid={`verification-document-status-${doc.id}`} />
                   <div className="flex items-center gap-1">
@@ -343,7 +517,18 @@ export default function VerificationWorkspace() {
                         size="xs"
                         variant={doc.status === status ? "default" : "outline"}
                         disabled={setDocStatus.isPending}
-                        onClick={() => setDocStatus.mutate({ docId: doc.id, status })}
+                        onClick={() => {
+                          if (
+                            doc.document_uuid &&
+                            (status === "verified" || status === "rejected")
+                          ) {
+                            setDocStatus.mutate({
+                              certificateUUID: doc.document_uuid,
+                              documentType: doc.doc_type,
+                              status,
+                            });
+                          }
+                        }}
                         data-testid={`verification-doc-${doc.id}-set-${status}`}
                         className={doc.status === status ? "" : "bg-white"}
                       >
@@ -451,7 +636,7 @@ export default function VerificationWorkspace() {
             <div className="space-y-2 p-4">
               <Button
                 className="w-full bg-emerald-600 text-white hover:bg-emerald-700"
-                disabled={decided || decide.isPending}
+                disabled={decided || decide.isPending || approvePartner.isPending}
                 onClick={() => {
                   setAction("approve");
                   setReason("");
@@ -463,7 +648,7 @@ export default function VerificationWorkspace() {
               <Button
                 variant="outline"
                 className="w-full border-amber-300 bg-white text-amber-700 hover:bg-amber-50"
-                disabled={decide.isPending}
+                disabled={decide.isPending || approvePartner.isPending}
                 onClick={() => {
                   setAction("request_correction");
                   setReason("");
@@ -475,7 +660,7 @@ export default function VerificationWorkspace() {
               <Button
                 variant="destructive"
                 className="w-full"
-                disabled={decided || decide.isPending}
+                disabled={decided || decide.isPending || approvePartner.isPending}
                 onClick={() => {
                   setAction("reject");
                   setReason("");
@@ -602,9 +787,18 @@ export default function VerificationWorkspace() {
             />
             <Button
               disabled={
-                decide.isPending || (action !== "approve" && !reason.trim())
+                decide.isPending ||
+                approvePartner.isPending ||
+                (action !== "approve" && !reason.trim())
               }
-              onClick={() => action && decide.mutate({ action, reason: reason.trim() })}
+              onClick={() => {
+                if (!action) return;
+                if (action === "approve") {
+                  approvePartner.mutate();
+                } else {
+                  decide.mutate({ action, reason: reason.trim() });
+                }
+              }}
               data-testid="verification-decision-confirm"
               className={
                 action === "reject"

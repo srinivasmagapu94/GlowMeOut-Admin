@@ -11,6 +11,12 @@ export interface AdminUser {
   last_login: string | null;
 }
 
+export interface AdminLoginResponse {
+  adminUUID?: string;
+  validAdmin: boolean;
+  errorMessage?: string;
+}
+
 export interface PageResult<T> {
   items: T[];
   total: number;
@@ -55,11 +61,114 @@ export interface Partner {
   bio: string;
 }
 
+export interface PartnersApiRecord {
+  id?: string;
+  partnerUUID?: string;
+  partnerId?: string;
+  code?: string;
+  fullName?: string;
+  owner_name?: string;
+  ownerName?: string;
+  business_name?: string;
+  businessName?: string;
+  email?: string;
+  phone?: string;
+  phoneNumber?: string;
+  city?: string;
+  services?: string[];
+  categories?: string[];
+  rating?: number;
+  reviews_count?: number;
+  reviewsCount?: number;
+  jobs_completed?: number;
+  jobsCompleted?: number;
+  revenue?: number;
+  account_status?: string;
+  accountStatus?: string;
+  verification_status?: string;
+  verificationStatus?: string;
+  joined_at?: string;
+  onBoardingTimestamp?: string;
+  onboardingTimestamp?: string;
+  LastUpdateTimestamp?: string;
+  lastUpdateTimestamp?: string;
+}
+
+export interface PartnersResponse {
+  records: PartnersApiRecord[];
+  pageNumber: number;
+  pageSize: number;
+  sortBy: string;
+  sortDirection: string;
+  totalRecords: number;
+}
+
+export interface PartnerDetailsResponse {
+  accountStatus: string;
+  city: string;
+  createTimestamp: string;
+  emailAddress: string;
+  expirationTimestamp: string | null;
+  fullAddress: string;
+  fullName: string;
+  id: number;
+  lastUpdateTimestamp: string;
+  mobileNumber: string;
+  onBoardingTimestamp: string;
+  partnerBankDetails?: {
+    accountHolderName: string;
+    accountNumber: string;
+    bankName: string;
+    ifscCode: string;
+  } | null;
+  partnerDocuments?: {
+    id?: string | number;
+    partnerDocumentUUID?: string;
+    documentType?: string;
+    document_type?: string;
+    name?: string;
+    documentName?: string;
+    fileLabel?: string;
+    file_label?: string;
+    documentUrl?: string;
+    documentURL?: string;
+    fileUrl?: string;
+    fileURL?: string;
+    url?: string;
+    createTimestamp?: string;
+    uploadedAt?: string;
+    uploadTimestamp?: string;
+    expirationTimestamp?: string | null;
+    lastUpdateTimestamp?: string;
+    status?: string;
+  }[] | null;
+  partnerKYC?: {
+    aadhaarNumber: string;
+    panNumber: string | null;
+  } | null;
+  partnerOnBoardingVerification?: {
+    comments: string;
+    isBankDetailsValidated: boolean;
+    isCertificateValidated: boolean;
+    isKYCValidated: boolean;
+    isProfileAccepted: boolean;
+    isProfileRejected: boolean;
+    lastUpdateTimestamp: string;
+  } | null;
+  partnerServiceType?: { serviceType: string }[];
+  partnerUUID: string;
+  pinCode: string;
+  state: string;
+  verificationStatus: string;
+}
+
 export interface VerificationDocument {
   id: string;
+  document_uuid?: string;
   name: string;
   doc_type: string;
   file_label: string;
+  url?: string;
   uploaded_at: string;
   status: string;
 }

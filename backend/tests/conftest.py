@@ -11,12 +11,12 @@ import httpx
 import pytest
 import pytest_asyncio
 
-BACKEND_URL = os.environ.get("BACKEND_URL", "http://localhost:8001")
+BACKEND_URL = os.environ.get("BACKEND_URL", "http://localhost:8082")
 API_URL = f"{BACKEND_URL}/api"
 
 
 def api_url(path: str = "") -> str:
-    """Absolute URL for an /api route: api_url("/status") -> http://localhost:8001/api/status."""
+    """Absolute URL for an /api route: api_url("/status") -> http://localhost:8082/api/status."""
     return f"{API_URL}{path}"
 
 
